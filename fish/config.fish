@@ -3,6 +3,7 @@ if status is-interactive
     alias vi='nvim'
     alias tmux='tmux -u'
     alias fzfprev=' fzf --preview="bat --color=always {}" '
+    alias ff='fastfetch'
     #alias ls='exa -l --icons'
 
     set -x PATH /usr/bin/go $PATH
