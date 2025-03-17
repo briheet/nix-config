@@ -48,6 +48,10 @@ return {
 			formatters_by_ft = {
 				lua = { "stylua" },
 				go = { "gofumpt", "goimports" },
+				typescript = { "prettier", "prettierd", stop_after_first = true },
+				javascript = { "prettier", "prettierd", stop_after_first = true },
+				tsx = { "prettier", "prettierd", stop_after_first = true },
+				rust = {},
 				-- Conform can also run multiple formatters sequentially
 				-- python = { "isort", "black" },
 				--
@@ -271,6 +275,7 @@ return {
 				clangd = {},
 				gopls = {},
 				pyright = {},
+				ts_ls = {},
 				-- rust_analyzer = {},
 				-- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
 				--
@@ -413,6 +418,9 @@ return {
 					--  Generally you don't need this, because nvim-cmp will display
 					--  completions whenever it has completion options available.
 					["<C-Space>"] = cmp.mapping.complete({}),
+
+					-- Map Enter to confirm completion
+					["<CR>"] = cmp.mapping.confirm({ select = true }),
 
 					-- Think of <c-l> as moving to the right of your snippet expansion.
 					--  So if you have a snippet that's like:
