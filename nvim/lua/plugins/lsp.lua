@@ -47,11 +47,12 @@ return {
 			end,
 			formatters_by_ft = {
 				lua = { "stylua" },
-				go = { "gofumpt", "goimports" },
-				typescript = { "prettier", "prettierd", stop_after_first = true },
-				javascript = { "prettier", "prettierd", stop_after_first = true },
-				tsx = { "prettier", "prettierd", stop_after_first = true },
+				go = { "goimports", "gofumpt", "gopls" },
 				rust = {},
+				yaml = {},
+				-- typescript = { "prettier", "prettierd", stop_after_first = true },
+				-- javascript = { "prettier", "prettierd", stop_after_first = true },
+				-- tsx = { "prettier", "prettierd", stop_after_first = true },
 				-- Conform can also run multiple formatters sequentially
 				-- python = { "isort", "black" },
 				--
@@ -274,9 +275,9 @@ return {
 			local servers = {
 				clangd = {},
 				gopls = {},
-				pyright = {},
-				ts_ls = {},
-				-- rust_analyzer = {},
+				rust_analyzer = {},
+				-- pyright = {},
+				-- ts_ls = {},
 				-- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
 				--
 				-- Some languages (like typescript) have entire language plugins that can be useful:
