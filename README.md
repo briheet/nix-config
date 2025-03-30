@@ -9,3 +9,15 @@ Please be sure you have some basic knowledge of how things work before cloning t
 ``` bash
 git clone --branch wallcodes --single-branch https://github.com/briheet/dotfiles.git
 ```
+
+## Plain Desktop
+
+![Desktop](assets/desktop.png)
+
+## SDDM
+
+![SDDM](assets/sddm.png)
+
+## GRUB
+
+![GRUB](assets/grub.png)
