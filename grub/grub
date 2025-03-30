@@ -43,7 +43,7 @@ GRUB_COLOR_NORMAL="light-blue/black"
 #GRUB_COLOR_HIGHLIGHT="light-cyan/blue"
 
 # Uncomment one of them for the gfx desired, a image background or a gfxtheme
-GRUB_BACKGROUND="/home/brsy/dotfiles/Wallpapers/wallhaven-p969ep.png"
+GRUB_BACKGROUND="/home/brsy/dotfiles/Wallpapers/roadrash.png"
 # GRUB_THEME="/path/to/gfxtheme"
 
 # Uncomment to get a beep at GRUB start
