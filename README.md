@@ -21,3 +21,7 @@ git clone --branch wallcodes --single-branch https://github.com/briheet/dotfiles
 ## GRUB
 
 ![GRUB](assets/grub.png)
+
+## Desktop Wallpaper
+
+![Desktop Wallpaper](assets/wallhaven-x6wx9z.png)

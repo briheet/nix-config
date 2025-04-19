@@ -4,9 +4,12 @@ if status is-interactive
     alias tmux='tmux -u'
     alias fzfprev=' fzf --preview="bat --color=always {}" '
     alias ff='fastfetch'
-    #alias ls='exa -l --icons'
+    alias ls='exa -l --icons'
 
-    set -x PATH /usr/bin/go $PATH
+    bind \co ranger-cd
+    pyenv init - fish | source
+    set -x MAKE_OPTS "-j1"
+    # set -x PATH /usr/bin/go $PATH
 end
 
 #function fish_prompt

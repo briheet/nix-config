@@ -30,9 +30,12 @@ vim.keymap.set("n", "<leader>q", vim.diagnostic.setloclist, { desc = "Open diagn
 vim.keymap.set("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" })
 
 -- Diagnostics
-vim.keymap.set("n", "[d", vim.diagnostic.goto_next, { desc = "Goto the next diagnostic found in the file" })
-vim.keymap.set("n", "]d", vim.diagnostic.goto_prev, { desc = "Goto the prev diagnostic found in the file" })
+vim.keymap.set("n", "[d", function()
+	vim.diagnostic.jump({ count = 1, float = true })
+end)
+vim.keymap.set("n", "]d", function()
+	vim.diagnostic.jump({ count = -1, float = true })
+end)
 
-vim.keymap.set("n", "<C-j>", function()
-	vim.diagnostic.goto_next()
-end, opts)
+-- File Explorer Toggle
+vim.keymap.set("n", "<leader>e", ":NvimTreeToggle<CR>", { noremap = true, silent = true })

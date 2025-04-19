@@ -47,9 +47,11 @@ return {
 			end,
 			formatters_by_ft = {
 				lua = { "stylua" },
-				go = { "goimports", "gofumpt", "gopls" },
-				rust = {},
+				go = { "goimports", "gofmt" },
+				rust = { "rustfmt", lsp_format = "fallback" },
 				yaml = {},
+				zig = {},
+				cpp = { "clang-format" },
 				-- typescript = { "prettier", "prettierd", stop_after_first = true },
 				-- javascript = { "prettier", "prettierd", stop_after_first = true },
 				-- tsx = { "prettier", "prettierd", stop_after_first = true },
@@ -276,6 +278,7 @@ return {
 				clangd = {},
 				gopls = {},
 				rust_analyzer = {},
+				zls = {},
 				-- pyright = {},
 				-- ts_ls = {},
 				-- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
