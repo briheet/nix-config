@@ -6,7 +6,11 @@ vim.opt.termguicolors = true
 -- vim.g.transparent = true
 
 -- empty setup using defaults
-require("nvim-tree").setup()
+require("nvim-tree").setup({
+	filters = {
+		dotfiles = false,
+	},
+})
 
 -- -- OR setup with some options
 -- require("nvim-tree").setup({

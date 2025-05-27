@@ -3,14 +3,15 @@ if status is-interactive
     alias vi='nvim'
     alias tmux='tmux -u'
     alias fzfprev=' fzf --preview="bat --color=always {}" '
-    alias ff='fastfetch'
-    alias ls='exa -l --icons'
+    alias ff='fastfetch --config groups.jsonc'
+    alias clock='tty-clock -c'
+    #    alias ls='exa -l --icons'
 
     bind \co ranger-cd
     pyenv init - fish | source
     set -x MAKE_OPTS "-j1"
-    # set -x PATH /usr/bin/go $PATH
 end
+starship init fish | source
 
 #function fish_prompt
 #    echo -n (hostname)' '(basename (pwd))' \$'

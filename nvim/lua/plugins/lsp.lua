@@ -51,7 +51,8 @@ return {
 				rust = { "rustfmt", lsp_format = "fallback" },
 				yaml = {},
 				zig = {},
-				cpp = { "clang-format" },
+				-- cpp = { "clang-format" },
+				python = { "isort", "black" },
 				-- typescript = { "prettier", "prettierd", stop_after_first = true },
 				-- javascript = { "prettier", "prettierd", stop_after_first = true },
 				-- tsx = { "prettier", "prettierd", stop_after_first = true },
@@ -276,10 +277,24 @@ return {
 			--        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
 			local servers = {
 				clangd = {},
-				gopls = {},
+				-- gopls = {},
+				gopls = {
+					settings = {
+						gopls = {
+							analyses = {
+								nilness = true,
+								unusedparams = true,
+								unusedwrite = true,
+								fieldalignment = true,
+								shadow = true,
+							},
+							staticcheck = true,
+						},
+					},
+				},
 				rust_analyzer = {},
 				zls = {},
-				-- pyright = {},
+				pyright = {},
 				-- ts_ls = {},
 				-- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
 				--
