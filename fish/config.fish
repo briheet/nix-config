@@ -9,7 +9,6 @@ if status is-interactive
     #    alias ls='exa -l --icons'
 
     bind \co ranger-cd
-    pyenv init - fish | source
     set -x MAKE_OPTS "-j1"
 end
 starship init fish | source
