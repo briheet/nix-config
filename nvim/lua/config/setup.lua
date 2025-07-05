@@ -1,3 +1,5 @@
+local opts = { noremap = true, silent = true }
+
 -- Set to true if you have a Nerd Font installed and selected in the terminal
 vim.g.have_nerd_font = true
 
@@ -76,3 +78,5 @@ vim.api.nvim_create_autocmd("BufWritePre", {
 		vim.lsp.buf.code_action({ context = { only = { "source.organizeImports" } }, apply = true })
 	end,
 })
+
+-- ToggleTerm

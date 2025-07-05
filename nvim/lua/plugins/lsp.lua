@@ -51,10 +51,15 @@ return {
 				rust = { "rustfmt", lsp_format = "fallback" },
 				yaml = {},
 				zig = {},
-				-- cpp = { "clang-format" },
+				cpp = { "clang-format" },
 				python = { "isort", "black" },
-				-- typescript = { "prettier", "prettierd", stop_after_first = true },
-				-- javascript = { "prettier", "prettierd", stop_after_first = true },
+				-- typescript = { { "prettierd", "prettier"  } },
+				-- typescriptreact = { { "prettierd", "prettier" } },
+				-- javascript = { { "prettierd", "prettier"  } },
+				-- javascriptreact = { { "prettierd", "prettier"} },
+				-- json = { { "prettierd", "prettier" } },
+				-- html = { { "prettierd", "prettier" } },
+				-- css = { { "prettierd", "prettier" } },
 				-- tsx = { "prettier", "prettierd", stop_after_first = true },
 				-- Conform can also run multiple formatters sequentially
 				-- python = { "isort", "black" },
@@ -295,7 +300,8 @@ return {
 				rust_analyzer = {},
 				zls = {},
 				pyright = {},
-				-- ts_ls = {},
+				protols = {},
+				ts_ls = {},
 				-- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
 				--
 				-- Some languages (like typescript) have entire language plugins that can be useful:

@@ -5,6 +5,7 @@ if status is-interactive
     alias fzfprev=' fzf --preview="bat --color=always {}" '
     alias ff='fastfetch --config groups.jsonc'
     alias clock='tty-clock -c'
+    alias task='go-task'
     #    alias ls='exa -l --icons'
 
     bind \co ranger-cd
