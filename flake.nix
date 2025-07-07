@@ -1,5 +1,5 @@
 {
-  description = "Example nix-darwin system flake";
+  description = "Flake for minimal macOS";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -21,14 +21,26 @@
 	        starship
 	        fish
           fastfetch
+	        go
+          golangci-lint
+          rustc
+          cargo
+	        nodejs
+          bun
+          prettierd
+          docker
+          docker-compose
+          lazygit
+          postgresql
+          pnpm
         ];
 
       # Necessary for using flakes on this system.
       nix.settings.experimental-features = "nix-command flakes";
 
       # Enable alternative shell support in nix-darwin.
-        programs.fish.enable = true;
-   	programs.zsh.enable = true;
+      programs.fish.enable = true;
+   	  programs.zsh.enable = true;
 
     	environment.variables = {
     	PATH = "${pkgs.kitty}/Applications:${pkgs.kitty}/bin:$PATH";
@@ -40,6 +52,8 @@
       # Used for backwards compatibility, please read the changelog before changing.
       # $ darwin-rebuild changelog
       system.stateVersion = 6;
+
+      # Hostname change
       networking.hostName = "makima";
 
       # The platform the configuration will be used on.
@@ -48,11 +62,7 @@
   in
   {
     # Build darwin flake using:
-    # $ darwin-rebuild build --flake .#Briheets-MacBook-Pro
-    # darwinConfigurations."Briheets-MacBook-Pro" = nix-darwin.lib.darwinSystem {
-    #   modules = [ configuration ];
-    # };
-
+    # $ darwin-rebuild build --flake .#makima
     darwinConfigurations."makima" = nix-darwin.lib.darwinSystem {
       modules = [ configuration ];
     };
