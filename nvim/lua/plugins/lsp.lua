@@ -404,7 +404,10 @@ return {
 			-- See `:help cmp`
 			local cmp = require("cmp")
 			local luasnip = require("luasnip")
-			luasnip.config.setup({})
+			luasnip.config.setup({
+
+				log_level = "off",
+			})
 
 			cmp.setup({
 				snippet = {

@@ -3,6 +3,9 @@ local opts = { noremap = true, silent = true }
 -- Set to true if you have a Nerd Font installed and selected in the terminal
 vim.g.have_nerd_font = true
 
+-- Swap Issue macOS
+vim.opt.swapfile = false
+
 -- Setup number line
 vim.opt.number = true
 vim.opt.relativenumber = true

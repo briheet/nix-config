@@ -3,7 +3,7 @@ if status is-interactive
     alias vi='nvim'
     alias tmux='tmux -u'
     alias fzfprev=' fzf --preview="bat --color=always {}" '
-    alias ff='fastfetch --config groups.jsonc'
+    alias ff='fastfetch --config ~/.config/fastfetch/groups.jsonc'
     alias clock='tty-clock -c'
     alias task='go-task'
     #    alias ls='exa -l --icons'
