@@ -298,7 +298,7 @@ return {
 					},
 				},
 				rust_analyzer = {},
-				zls = {},
+				-- zls = {},
 				pyright = {},
 				protols = {},
 				ts_ls = {},

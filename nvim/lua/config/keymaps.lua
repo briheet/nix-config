@@ -38,4 +38,4 @@ vim.keymap.set("n", "]d", function()
 end)
 
 -- File Explorer Toggle
-vim.keymap.set("n", "<leader>e", ":NvimTreeToggle<CR>", { noremap = true, silent = true })
+vim.keymap.set("n", "<leader>e", ":Neotree toggle<CR>", { noremap = true, silent = true })
