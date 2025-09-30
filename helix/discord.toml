@@ -1,0 +1,11 @@
+[language-server.discord-rpc]
+command = "discord-rpc-lsp"  # full path if needed
+
+[[language]]
+name = "go"
+language-servers = ["discord-rpc"]
+
+[[language]]
+name = "python"
+language-servers = ["discord-rpc"]
+
