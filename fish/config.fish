@@ -6,12 +6,11 @@ if status is-interactive
     alias ff='fastfetch --config ~/.config/fastfetch/groups.jsonc'
     alias clock='tty-clock -c'
     alias task='go-task'
-    #    alias ls='exa -l --icons'
 
     bind \co ranger-cd
-    set -x MAKE_OPTS "-j1"
+    set -x MAKE_OPTS -j1
 end
-starship init fish | source
+# starship init fish | source
 
 #function fish_prompt
 #    echo -n (hostname)' '(basename (pwd))' \$'

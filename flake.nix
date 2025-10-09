@@ -21,25 +21,18 @@
 	        starship
 	        fish
           fastfetch
-	        go
+          go
           golangci-lint
           rustc
           cargo
 	        nodejs
-          bun
-          prettierd
           docker
           docker-compose
           lazygit
-          postgresql
-          pnpm
           go-task
-          pkg-config
-          vips
           ripgrep
           ranger
           tree
-          protobuf
           air
           uutils-findutils
           glib
@@ -47,8 +40,14 @@
           vscode
           ffmpeg
           clang
+          clang-tools
           btop
-          libiconv
+          subversion
+          rustfmt
+          rust-analyzer
+          rustfmt
+          lldb
+          helix
         ];
 
       # Necessary for using flakes on this system.
