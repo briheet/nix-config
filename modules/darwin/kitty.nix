@@ -10,17 +10,12 @@
   programs.kitty = {
     enable = true;
     themeFile = "Everforest_Dark_Hard";
-  };
 
-
-  programs.kitty = {
     font = {
       name = "Caskaydia Cove";
       size = 12;
     };
-  };
 
-  programs.kitty = {
     keybindings = {
       "ctrl+shift+t" = "launch --cwd=current --type=tab";
       "ctrl+q" = "close_window";
@@ -74,9 +69,7 @@
       # Delete word
       "ctrl+backspace" = "send_text all \\x17";
     };
-  };
 
-  programs.kitty = {
     settings = {
       background_opacity = 0.9;
       background_tint = "0.5";
@@ -87,8 +80,11 @@
       cursor_trail_start_threshold = "2";
       cursor_blink_interval = 0;
     };
-  };
 
+    shellIntegration = {
+      enableFishIntegration = true;
+    };
  
+  };
 
 }
