@@ -4,8 +4,7 @@
 
   home.packages = with pkgs; [
     helix
-    aerospace
+    starship
   ];
-
   
 }

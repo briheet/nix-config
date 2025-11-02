@@ -4,8 +4,7 @@
 
 {
   networking.hostName = "makima";
-
-  services.nix-daemon.enable = true;
+  system.stateVersion = 6;
 
   users.users.briheet = {
     name = "briheet";
