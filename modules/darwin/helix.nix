@@ -8,6 +8,7 @@
     gopls
     go_1_25
     goperf
+    golangci-lint
     golangci-lint-langserver
     delve
   ];
@@ -41,9 +42,11 @@
       config.command = [
         "golangci-lint"
         "run"
-        # "--path-mode=abs"
-        # "--output-format=json:stdout"
-        # "--out-format=line-number"
+        "--path-mode=abs"
+        "--output.json.path=stdout"
+        "--output.text.path=/dev/null"
+        "--show-stats=false"
+        "--issues-exit-code=1"
       ];
     };
 
@@ -52,17 +55,13 @@
       cargo.allFeatures = true;
     };
 
-    languages.language-server.discord-rpc = {
-      command = "/Users/briheet/go/bin/discord-rpc-lsp";
-    };
-
     languages.language = [
       {
         name = "go";
         roots = [ "go.work" "go.mod" ];
         auto-format = true;
         formatter.command = "gofmt";
-        language-servers = [ "gopls" "golangci-lint-lsp" "discord-rpc" ];
+        language-servers = [ "gopls" "golangci-lint-lsp" ];
       }
       {
         name = "rust";
@@ -71,7 +70,7 @@
           command = "rustfmt";
           args = [ "--edition" "2021" ];
         };
-        language-servers = [ "rust-analyzer" "discord-rpc" ];
+        language-servers = [ "rust-analyzer" ];
       }
     ];
   };

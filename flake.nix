@@ -26,7 +26,7 @@
       specialArgs = { inherit pkgs; };
 
       modules = [
-        ./darwin/configuration.nix
+        ./systems/darwin/configuration.nix
 
         # Integrate Home Manager
         home-manager.darwinModules.home-manager
@@ -34,7 +34,7 @@
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
           home-manager.backupFileExtension = "backup";
-          home-manager.users.briheet = import ./darwin/home.nix;
+          home-manager.users.briheet = import ./systems/darwin/home.nix;
         }
       ];
     };
