@@ -12,6 +12,7 @@
     ripgrep
     ranger
     tree
+    go-task
     uutils-findutils
     glib
     graphviz
@@ -21,6 +22,8 @@
     subversion
     clippy
     lldb
+    oxker
+    obsidian
   ];
 
   

@@ -4,6 +4,7 @@
   home.packages = with pkgs; [
     rust-analyzer
     rustfmt
+    cargo
 
     gopls
     go_1_25
@@ -48,6 +49,17 @@
         "--show-stats=false"
         "--issues-exit-code=1"
       ];
+    };
+
+    # Surface Go escape analysis / GC hints inline via gopls.
+    languages.language-server.gopls.config = {
+      "ui.codelenses" = {
+        gc_details = true;
+      };
+      "ui.diagnostic.annotations" = {
+        escape = true;
+        inline = true;
+      };
     };
 
     languages.language-server.rust-analyzer.config = {
