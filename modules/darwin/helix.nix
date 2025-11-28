@@ -38,6 +38,25 @@
       "ui.gutter" = {};
     };
 
+    languages.language = [
+      {
+        name = "go";
+        roots = [ "go.work" "go.mod" ];
+        auto-format = true;
+        formatter.command = "gofmt";
+        language-servers = [ "gopls" "golangci-lint-lsp" ];
+      }
+      {
+        name = "rust";
+        auto-format = true;
+        formatter = {
+          command = "rustfmt";
+          args = [ "--edition" "2021" ];
+        };
+        language-servers = [ "rust-analyzer" ];
+      }
+    ];
+
     languages.language-server.golangci-lint-lsp = {
       command = "golangci-lint-langserver";
       config.command = [
@@ -67,23 +86,5 @@
       cargo.allFeatures = true;
     };
 
-    languages.language = [
-      {
-        name = "go";
-        roots = [ "go.work" "go.mod" ];
-        auto-format = true;
-        formatter.command = "gofmt";
-        language-servers = [ "gopls" "golangci-lint-lsp" ];
-      }
-      {
-        name = "rust";
-        auto-format = true;
-        formatter = {
-          command = "rustfmt";
-          args = [ "--edition" "2021" ];
-        };
-        language-servers = [ "rust-analyzer" ];
-      }
-    ];
   };
 }

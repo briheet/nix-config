@@ -22,7 +22,6 @@
     subversion
     clippy
     lldb
-    oxker
     obsidian
   ];
 
