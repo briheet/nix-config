@@ -23,7 +23,9 @@
     clippy
     lldb
     obsidian
+    pnpm
+    hyperfine
+    utm
   ];
 
-  
 }

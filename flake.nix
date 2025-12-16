@@ -12,31 +12,39 @@
     };
   };
 
-  outputs = { self, nixpkgs, nix-darwin, home-manager, ... }:
-  let
-    system = "aarch64-darwin";
+  outputs =
+    {
+      self,
+      nixpkgs,
+      nix-darwin,
+      home-manager,
+      ...
+    }:
+    let
+      system = "aarch64-darwin";
 
-    pkgs = import nixpkgs {
-      inherit system;
-      config.allowUnfree = true;
+      pkgs = import nixpkgs {
+        inherit system;
+        config.allowUnfree = true;
+      };
+    in
+    {
+      darwinConfigurations."makima" = nix-darwin.lib.darwinSystem {
+        inherit system;
+        specialArgs = { inherit pkgs; };
+
+        modules = [
+          ./systems/darwin/configuration.nix
+
+          # Integrate Home Manager
+          home-manager.darwinModules.home-manager
+          {
+            home-manager.useGlobalPkgs = true;
+            home-manager.useUserPackages = true;
+            home-manager.backupFileExtension = "backup";
+            home-manager.users.briheet = import ./systems/darwin/home.nix;
+          }
+        ];
+      };
     };
-  in {
-    darwinConfigurations."makima" = nix-darwin.lib.darwinSystem {
-      inherit system;
-      specialArgs = { inherit pkgs; };
-
-      modules = [
-        ./systems/darwin/configuration.nix
-
-        # Integrate Home Manager
-        home-manager.darwinModules.home-manager
-        {
-          home-manager.useGlobalPkgs = true;
-          home-manager.useUserPackages = true;
-          home-manager.backupFileExtension = "backup";
-          home-manager.users.briheet = import ./systems/darwin/home.nix;
-        }
-      ];
-    };
-  };
 }

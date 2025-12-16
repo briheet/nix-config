@@ -9,7 +9,7 @@
 
   programs.kitty = {
     enable = true;
-    themeFile = "Everforest_Dark_Hard";
+    themeFile = "Solarized_Dark_-_Patched";
 
     font = {
       name = "Caskaydia Cove";
@@ -71,8 +71,8 @@
     };
 
     settings = {
-      background_opacity = 0.9;
-      background_tint = "0.5";
+      background_opacity = 1.0;
+      background_tint = 1.0;
       macos_traditional_fullscreen = true;
 
       # cursor_trail = "1";
@@ -82,7 +82,7 @@
 
       shell = "${pkgs.fish}/bin/fish";
     };
- 
+
   };
 
 }

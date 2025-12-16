@@ -7,13 +7,16 @@
   system.stateVersion = 6;
 
   # Enable experimental Nix features
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.settings.experimental-features = [
+    "nix-command"
+    "flakes"
+  ];
 
   users.users.briheet = {
     name = "briheet";
     home = "/Users/briheet";
   };
-  
+
   home-manager = {
     useGlobalPkgs = true;
     useUserPackages = true;

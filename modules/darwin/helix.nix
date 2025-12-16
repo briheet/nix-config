@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 
 {
   home.packages = with pkgs; [
@@ -12,6 +12,10 @@
     golangci-lint
     golangci-lint-langserver
     delve
+
+    nil
+    nixd
+    alejandra
   ];
 
   programs.helix = {
@@ -19,7 +23,7 @@
     defaultEditor = true;
 
     settings = {
-      theme = "everforest_dark";
+      theme = "solarized_dark";
       editor = {
         line-number = "relative";
         lsp.display-messages = true;
@@ -31,29 +35,45 @@
       };
     };
 
-    themes.everforest_dark = {
-      inherits = "everforest_dark";
-      "ui.background" = {};
-      "ui.statusline" = {};
-      "ui.gutter" = {};
+    themes.solarized_dark = {
+      inherits = "solarized_dark";
+      "ui.background" = { };
+      "ui.statusline" = { };
+      "ui.gutter" = { };
     };
 
     languages.language = [
       {
         name = "go";
-        roots = [ "go.work" "go.mod" ];
+        roots = [
+          "go.work"
+          "go.mod"
+        ];
         auto-format = true;
         formatter.command = "gofmt";
-        language-servers = [ "gopls" "golangci-lint-lsp" ];
+        language-servers = [
+          "gopls"
+          "golangci-lint-lsp"
+        ];
       }
       {
         name = "rust";
         auto-format = true;
         formatter = {
           command = "rustfmt";
-          args = [ "--edition" "2021" ];
+          args = [
+            "--edition"
+            "2021"
+          ];
         };
         language-servers = [ "rust-analyzer" ];
+      }
+      {
+        name = "nix";
+        formatter = {
+          command = lib.getExe pkgs.nixfmt-rfc-style;
+        };
+        auto-format = true;
       }
     ];
 
