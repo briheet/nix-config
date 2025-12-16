@@ -26,6 +26,7 @@
     pnpm
     hyperfine
     utm
+    direnv
   ];
 
 }
