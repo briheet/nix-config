@@ -1,11 +1,24 @@
 # Macos level configuration.
 
 { pkgs, lib, ... }:
-
 {
 
   # Unfree packages (Vscode, obsidian)
   nixpkgs.config.allowUnfree = true;
+  # users.users.briheet.shell = pkgs.fish;
+
+  # System docs
+  documentation = {
+    enable = true;
+    doc.enable = false;
+    info.enable = false;
+    man.enable = true;
+  };
+
+  # Environment
+  environment = {
+    shells = [ pkgs.fish ];
+  };
 
   networking.hostName = "makima";
   system.stateVersion = 6;
@@ -28,26 +41,8 @@
     users.briheet = import ./home.nix;
   };
 
-  programs.fish.enable = true;
-  programs.fish.shellInit = ''
-    __nixos_path_fix
-  '';
-
-  environment.etc."fish/nixos-env-preinit.fish".text = lib.mkMerge [
-    (lib.mkBefore ''
-      set -g __nixos_path_original $PATH
-    '')
-    (lib.mkAfter ''
-      function __nixos_path_fix -d "fix PATH value"
-        set -l result (string replace '$HOME' "$HOME" $__nixos_path_original)
-        for elt in $PATH
-          if not contains -- $elt $result
-            set -a result $elt
-          end
-        end
-        set -g PATH $result
-      end
-    '')
-  ];
+  programs.fish = {
+    enable = true;
+  };
 
 }

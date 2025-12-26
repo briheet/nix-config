@@ -3,7 +3,7 @@
 {
   imports = [
     ../../modules/darwin/kitty.nix
-    ../../modules/darwin/fish.nix
+    # ../../modules/darwin/fish.nix
     ../../modules/darwin/tools.nix
     ../../modules/darwin/helix.nix
   ];
