@@ -44,6 +44,36 @@
     home = "/Users/briheet";
   };
 
-  programs.fish.enable = true;
+  # Global programs
+  programs = {
+    direnv.enable = true;
+    fish.enable = true;
+  };
 
+  # Systems
+  system = {
+    primaryUser = "briheet";
+
+    # Menu and system
+    defaults.NSGlobalDomain = {
+      AppleInterfaceStyle = "Dark";
+      AppleMeasurementUnits = "Centimeters";
+      AppleShowAllExtensions = true;
+      AppleShowAllFiles = true;
+      AppleShowScrollBars = "WhenScrolling";
+      _HIHideMenuBar = true;
+    };
+
+    # Dock stuff
+    defaults.dock.autohide = true;
+
+    # Keyboard stuff
+    keyboard = {
+      enableKeyMapping = true;
+      remapCapsLockToEscape = true;
+    };
+  };
+
+  # Time
+  time.timeZone = "Asia/Calcutta";
 }
