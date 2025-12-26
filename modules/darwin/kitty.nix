@@ -4,7 +4,6 @@
 
   home.packages = with pkgs; [
     kitty
-    nerd-fonts.caskaydia-cove
   ];
 
   programs.kitty = {
