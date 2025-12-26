@@ -13,6 +13,9 @@
     golangci-lint-langserver
     delve
 
+    zig_0_15
+    zls
+
     nil
     nixd
     alejandra
@@ -23,7 +26,7 @@
     defaultEditor = true;
 
     settings = {
-      theme = "solarized_dark";
+      theme = "everforest_dark";
       editor = {
         line-number = "relative";
         lsp.display-messages = true;
@@ -73,6 +76,10 @@
         formatter = {
           command = lib.getExe pkgs.nixfmt-rfc-style;
         };
+        auto-format = true;
+      }
+      {
+        name = "cpp";
         auto-format = true;
       }
     ];

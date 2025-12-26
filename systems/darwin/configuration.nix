@@ -3,6 +3,10 @@
 { pkgs, lib, ... }:
 
 {
+
+  # Unfree packages (Vscode, obsidian)
+  nixpkgs.config.allowUnfree = true;
+
   networking.hostName = "makima";
   system.stateVersion = 6;
 

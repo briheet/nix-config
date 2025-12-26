@@ -9,7 +9,8 @@
 
   programs.kitty = {
     enable = true;
-    themeFile = "Solarized_Dark_-_Patched";
+    # themeFile = "Solarized_Dark_-_Patched";
+    themeFile = "Everforest_Dark_Hard";
 
     font = {
       name = "Caskaydia Cove";
