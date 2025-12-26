@@ -36,6 +36,5 @@
       };
 
       # Put other configs here for other systems
-
     };
 }

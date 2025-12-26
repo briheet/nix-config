@@ -2,10 +2,8 @@
 
 { pkgs, lib, ... }:
 {
-
   # Unfree packages (Vscode, obsidian)
   nixpkgs.config.allowUnfree = true;
-  # users.users.briheet.shell = pkgs.fish;
 
   # System docs
   documentation = {
@@ -20,7 +18,18 @@
     shells = [ pkgs.fish ];
   };
 
-  networking.hostName = "makima";
+  # Networking
+  networking = {
+    applicationFirewall = {
+      enable = true;
+      enableStealthMode = true;
+      allowSigned = true;
+      allowSignedApp = true;
+    };
+    computerName = "Briheet's MacBook Pro";
+    hostName = "makima";
+  };
+
   system.stateVersion = 6;
 
   # Enable experimental Nix features
@@ -29,20 +38,12 @@
     "flakes"
   ];
 
+  # Users
   users.users.briheet = {
     name = "briheet";
     home = "/Users/briheet";
   };
 
-  home-manager = {
-    useGlobalPkgs = true;
-    useUserPackages = true;
-    verbose = true;
-    users.briheet = import ./home.nix;
-  };
-
-  programs.fish = {
-    enable = true;
-  };
+  programs.fish.enable = true;
 
 }
