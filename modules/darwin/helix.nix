@@ -2,6 +2,7 @@
 
 {
   home.packages = with pkgs; [
+    rustc
     rust-analyzer
     rustfmt
     cargo
@@ -26,7 +27,7 @@
     defaultEditor = true;
 
     settings = {
-      theme = "everforest_dark";
+      theme = "everforest_dark_transparent";
       editor = {
         line-number = "relative";
         lsp.display-messages = true;
@@ -38,12 +39,20 @@
       };
     };
 
-    themes.solarized_dark = {
-      inherits = "solarized_dark";
-      "ui.background" = { };
-      "ui.statusline" = { };
-      "ui.gutter" = { };
+    themes = {
+      everforest_dark_transparent = {
+        inherits = "everforest_dark";
+
+        "ui.background" = "none";
+      };
     };
+
+    # themes.everforest_dark = {
+    #   inherits = "solarized_dark";
+    #   "ui.background" = { };
+    #   "ui.statusline" = { };
+    #   "ui.gutter" = { };
+    # };
 
     languages.language = [
       {
@@ -66,7 +75,7 @@
           command = "rustfmt";
           args = [
             "--edition"
-            "2021"
+            "2024"
           ];
         };
         language-servers = [ "rust-analyzer" ];

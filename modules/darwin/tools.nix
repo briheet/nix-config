@@ -2,6 +2,7 @@
 {
 
   home.packages = with pkgs; [
+    vscode
     vim
     git
     nodejs

@@ -71,9 +71,11 @@
     };
 
     settings = {
-      background_opacity = 1.0;
-      background_tint = 1.0;
+      background_opacity = 0.7;
+      background_tint = 0.5;
       macos_traditional_fullscreen = true;
+
+      background_blur = 32;
 
       # cursor_trail = "1";
       # cursor_trail_decay = "0.1 0.4";
