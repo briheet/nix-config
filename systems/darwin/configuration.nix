@@ -5,6 +5,11 @@
   # Unfree packages (Vscode, obsidian)
   nixpkgs.config.allowUnfree = true;
 
+  # Package bundle .app
+  environment.systemPackages = with pkgs; [
+    kitty
+  ];
+
   # System docs
   documentation = {
     enable = true;

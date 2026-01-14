@@ -2,10 +2,6 @@
 
 {
 
-  home.packages = with pkgs; [
-    kitty
-  ];
-
   programs.kitty = {
     enable = true;
     # themeFile = "Solarized_Dark_-_Patched";
