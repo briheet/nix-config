@@ -67,7 +67,7 @@
     };
 
     settings = {
-      background_opacity = 0.7;
+      background_opacity = 0.8;
       background_tint = 0.5;
       macos_traditional_fullscreen = true;
 
@@ -81,6 +81,10 @@
       shell = "${pkgs.fish}/bin/fish";
     };
 
+  };
+
+  programs.fastfetch = {
+    enable = true;
   };
 
 }

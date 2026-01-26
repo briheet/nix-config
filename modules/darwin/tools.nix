@@ -2,6 +2,7 @@
 {
 
   home.packages = with pkgs; [
+    claude-code
     vscode
     vim
     git
@@ -25,7 +26,6 @@
     obsidian
     pnpm
     hyperfine
-    utm
     direnv
   ];
 

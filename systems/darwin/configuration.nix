@@ -1,6 +1,6 @@
 # Macos level configuration.
 
-{ pkgs, lib, ... }:
+{ pkgs, ... }:
 {
   # Unfree packages (Vscode, obsidian)
   nixpkgs.config.allowUnfree = true;
@@ -8,6 +8,8 @@
   # Package bundle .app
   environment.systemPackages = with pkgs; [
     kitty
+    discord
+    obsidian
   ];
 
   # System docs
