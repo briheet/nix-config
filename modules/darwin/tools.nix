@@ -2,7 +2,9 @@
 {
 
   home.packages = with pkgs; [
+    gh
     claude-code
+    telegram-desktop
     vscode
     vim
     git

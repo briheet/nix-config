@@ -10,6 +10,7 @@
     kitty
     discord
     obsidian
+    telegram-desktop
   ];
 
   # System docs
