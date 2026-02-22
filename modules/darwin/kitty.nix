@@ -67,7 +67,7 @@
     };
 
     settings = {
-      background_opacity = 0.8;
+      background_opacity = 1.0;
       background_tint = 0.5;
       macos_traditional_fullscreen = true;
 

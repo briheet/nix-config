@@ -6,6 +6,7 @@
     ../../modules/darwin/fish.nix
     ../../modules/darwin/tools.nix
     ../../modules/darwin/helix.nix
+    ../../modules/darwin/alacritty.nix
   ];
 
   home.username = "briheet";

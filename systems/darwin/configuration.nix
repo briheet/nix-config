@@ -11,6 +11,8 @@
     discord
     obsidian
     telegram-desktop
+    brave
+    alacritty
   ];
 
   # System docs

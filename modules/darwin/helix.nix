@@ -118,8 +118,8 @@
     };
 
     languages.language-server.rust-analyzer.config = {
-      checkOnSave.command = "clippy";
-      cargo.allFeatures = true;
+      check.command = "clippy";
+      # cargo.allFeatures = true;
     };
 
   };

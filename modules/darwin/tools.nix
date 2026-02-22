@@ -2,6 +2,8 @@
 {
 
   home.packages = with pkgs; [
+    brave
+    ngrok
     gh
     claude-code
     telegram-desktop
