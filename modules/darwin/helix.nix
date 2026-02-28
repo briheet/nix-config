@@ -20,6 +20,12 @@
     nil
     nixd
     alejandra
+
+    ocaml
+    opam
+    ocamlPackages.ocaml-lsp
+    ocamlformat
+    ocamlPackages.earlybird
   ];
 
   programs.helix = {
@@ -86,6 +92,35 @@
           command = lib.getExe pkgs.nixfmt;
         };
         auto-format = true;
+      }
+      {
+        name = "ocaml";
+        auto-format = true;
+        formatter.command = "ocamlformat";
+        formatter.args = [
+          "--enable-outside-detected-project"
+          "-"
+        ];
+        debugger = {
+          name = "ocamlearlybird";
+          transport = "tcp";
+          command = "ocamlearlybird";
+          args = [ "debug" ];
+          port-arg = "--port={}";
+          templates = [
+            {
+              name = "launch";
+              request = "launch";
+              completion = [
+                {
+                  name = "program";
+                  completion = "filename";
+                }
+              ];
+              args.program = "{0}";
+            }
+          ];
+        };
       }
       {
         name = "cpp";

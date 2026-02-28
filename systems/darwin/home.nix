@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ inputs, pkgs, ... }:
 {
 
   imports = [
@@ -7,6 +7,9 @@
     ../../modules/darwin/tools.nix
     ../../modules/darwin/helix.nix
     ../../modules/darwin/alacritty.nix
+    ../../modules/darwin/sketchybar.nix
+    ../../modules/darwin/zen-browser.nix
+    ../../modules/darwin/tmux.nix
   ];
 
   home.username = "briheet";

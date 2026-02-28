@@ -5,7 +5,7 @@
 
   programs.alacritty = {
     enable = true;
-    theme = "deep_space";
+    theme = "gruvbox_material_medium_dark";
 
     settings = {
       env = {
@@ -17,6 +17,7 @@
       window = {
         opacity = 0.7;
         blur = true;
+        decorations = "Buttonless";
       };
 
       terminal = {

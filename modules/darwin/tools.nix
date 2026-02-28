@@ -2,6 +2,7 @@
 {
 
   home.packages = with pkgs; [
+    (nerd-fonts.victor-mono)
     brave
     ngrok
     gh
