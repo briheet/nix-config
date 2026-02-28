@@ -7,6 +7,9 @@ Please be sure you have some basic knowledge of how things work before cloning t
 
 
 ## Macos setup
+
+![macOS Setup](assets/macos-setup.png)
+
 ```sh
 sudo darwin-rebuild switch --flake github:briheet/nix-config#makima
 ```
