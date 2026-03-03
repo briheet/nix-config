@@ -15,8 +15,8 @@
       };
 
       window = {
-        opacity = 0.7;
-        blur = true;
+        opacity = 1.0;
+        blur = false;
         decorations = "Buttonless";
       };
 
