@@ -58,6 +58,9 @@
         # Plane
         set -g base-index 1
         set -g pane-base-index 1
+
+        # Escape time
+        set -sg escape-time 10
       ";
 
     plugins = [
