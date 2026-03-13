@@ -1,1 +1,2 @@
 1. Cpu registers: https://blog.yossarian.net/2020/11/30/How-many-registers-does-an-x86-64-cpu-have
+2. https://ftp.cvut.cz/kernel/people/geoff/cell/ps3-linux-docs/CellProgrammingTutorial/BasicsOfSIMDProgramming.html

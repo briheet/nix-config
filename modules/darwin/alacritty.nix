@@ -17,7 +17,7 @@
       window = {
         opacity = 1.0;
         blur = false;
-        decorations = "Buttonless";
+        decorations = "Full";
       };
 
       terminal = {
