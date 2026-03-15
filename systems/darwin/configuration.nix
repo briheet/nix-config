@@ -13,7 +13,6 @@
     telegram-desktop
     brave
     alacritty
-    emacs
   ];
 
   # System docs
