@@ -26,6 +26,14 @@
     ocamlPackages.ocaml-lsp
     ocamlformat
     ocamlPackages.earlybird
+
+    # Python
+    python313
+    ty
+    ruff
+    python313Packages.debugpy
+    python313Packages.jedi-language-server
+    python313Packages.python-lsp-server
   ];
 
   programs.helix = {
@@ -118,6 +126,55 @@
                 }
               ];
               args.program = "{0}";
+            }
+          ];
+        };
+      }
+      {
+        name = "python";
+        roots = [
+          "pyproject.toml"
+          "setup.cfg"
+          "setup.py"
+          "requirements.txt"
+        ];
+        auto-format = true;
+        formatter = {
+          command = "ruff";
+          args = [
+            "format"
+            "-"
+          ];
+        };
+        language-servers = [
+          "ty"
+          "ruff"
+          "pylsp"
+          "jedi"
+        ];
+        debugger = {
+          name = "debugpy";
+          transport = "stdio";
+          command = "python";
+          args = [
+            "-m"
+            "debugpy.adapter"
+          ];
+          templates = [
+            {
+              name = "source";
+              request = "launch";
+              completion = [
+                {
+                  name = "entrypoint";
+                  completion = "filename";
+                  default = ".";
+                }
+              ];
+              args = {
+                mode = "debug";
+                program = "{0}";
+              };
             }
           ];
         };

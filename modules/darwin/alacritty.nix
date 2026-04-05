@@ -5,7 +5,8 @@
 
   programs.alacritty = {
     enable = true;
-    theme = "gruvbox_material_medium_dark";
+    # theme = "gruvbox_material_medium_dark";
+    theme = "ayu_mirage";
 
     settings = {
       env = {
@@ -15,7 +16,7 @@
       };
 
       window = {
-        opacity = 1.0;
+        opacity = 0.8;
         blur = false;
         decorations = "Full";
       };
