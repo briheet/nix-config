@@ -12,6 +12,9 @@
     zen-browser.url = "github:0xc000022070/zen-browser-flake";
     zen-browser.inputs.nixpkgs.follows = "nixpkgs";
     zen-browser.inputs.home-manager.follows = "home-manager";
+
+    # llm latest via numtide
+    llm-agents.url = "github:numtide/llm-agents.nix";
   };
 
   outputs =
@@ -25,6 +28,7 @@
       darwinConfigurations = {
         makima = darwin.lib.darwinSystem {
           system = "aarch64-darwin";
+          specialArgs = { inherit inputs; };
           modules = [
             ./systems/darwin/configuration.nix
 

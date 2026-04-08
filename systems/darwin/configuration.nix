@@ -1,19 +1,25 @@
 # Macos level configuration.
 
-{ pkgs, ... }:
+{ pkgs, inputs, ... }:
 {
   # Unfree packages (Vscode, obsidian)
   nixpkgs.config.allowUnfree = true;
 
   # Package bundle .app
-  environment.systemPackages = with pkgs; [
-    kitty
-    discord
-    obsidian
-    telegram-desktop
-    brave
-    alacritty
-  ];
+  environment.systemPackages =
+    with pkgs;
+    [
+      kitty
+      discord
+      obsidian
+      telegram-desktop
+      brave
+      alacritty
+    ]
+    ++ [
+      inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex
+
+    ];
 
   # System docs
   documentation = {

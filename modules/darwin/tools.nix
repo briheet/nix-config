@@ -6,8 +6,6 @@
     brave
     ngrok
     gh
-    claude-code
-    codex
     telegram-desktop
     vscode
     vim
