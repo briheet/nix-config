@@ -17,7 +17,7 @@
 
       window = {
         opacity = 0.8;
-        blur = false;
+        blur = true;
         decorations = "Full";
       };
 
