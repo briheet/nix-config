@@ -16,8 +16,8 @@
       };
 
       window = {
-        opacity = 0.8;
-        blur = true;
+        opacity = 1.0;
+        # blur = true;
         decorations = "Full";
       };
 

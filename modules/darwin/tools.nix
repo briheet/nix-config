@@ -3,11 +3,9 @@
 
   home.packages = with pkgs; [
     (nerd-fonts.victor-mono)
-    brave
-    ngrok
+    yabai
     gh
     telegram-desktop
-    vscode
     vim
     git
     nodejs
@@ -17,12 +15,7 @@
     ripgrep
     ranger
     tree
-    go-task
-    uutils-findutils
-    glib
-    graphviz
     vscode
-    ffmpeg
     btop
     subversion
     clippy
