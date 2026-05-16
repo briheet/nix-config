@@ -4,6 +4,7 @@
   home.packages = with pkgs; [
     (nerd-fonts.victor-mono)
     yabai
+    yazi
     gh
     telegram-desktop
     vim
