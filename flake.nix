@@ -14,7 +14,7 @@
     # zen-browser.inputs.home-manager.follows = "home-manager";
 
     # llm latest via numtide
-    # llm-agents.url = "github:numtide/llm-agents.nix";
+    llm-agents.url = "github:numtide/llm-agents.nix";
   };
 
   outputs =

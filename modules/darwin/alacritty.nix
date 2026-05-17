@@ -6,23 +6,26 @@
   programs.alacritty = {
     enable = true;
     # theme = "gruvbox_material_medium_dark";
-    theme = "ayu_mirage";
+    # theme = "ayu_mirage";
+    theme = "solarized_osaka";
 
     settings = {
       env = {
         TERM = "xterm-256color";
         TERM_PROGRAM = "Alacritty";
-        SHELL = "${pkgs.fish}/bin/fish";
+        # SHELL = "${pkgs.fish}/bin/fish";
+        SHELL = "${pkgs.nushell}/bin/nu";
       };
 
       window = {
-        opacity = 1.0;
-        # blur = true;
+        opacity = 0.9;
+        blur = true;
         decorations = "Full";
       };
 
       terminal = {
-        shell = "${pkgs.fish}/bin/fish";
+        # shell = "${pkgs.fish}/bin/fish";
+        shell = "${pkgs.nushell}/bin/nu";
       };
 
     };

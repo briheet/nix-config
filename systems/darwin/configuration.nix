@@ -6,15 +6,17 @@
   nixpkgs.config.allowUnfree = true;
 
   # Package bundle .app
-  environment.systemPackages = with pkgs; [
-    kitty
-    discord
-    obsidian
-    alacritty
-    # ]
-    # ++ [
-    # inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex
-  ];
+  environment.systemPackages =
+    with pkgs;
+    [
+      kitty
+      discord
+      obsidian
+      alacritty
+    ]
+    ++ [
+      inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex
+    ];
 
   # System docs
   documentation = {
