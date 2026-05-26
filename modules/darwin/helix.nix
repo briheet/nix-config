@@ -1,5 +1,43 @@
 { pkgs, lib, ... }:
 
+let
+  prettierFormatter =
+    parser:
+    {
+      command = "prettier";
+      args = [
+        "--parser"
+        parser
+      ];
+    };
+
+  jsDebugger = {
+    name = "js-debug";
+    transport = "tcp";
+    command = "js-debug";
+    port-arg = "{}";
+    templates = [
+      {
+        name = "source";
+        request = "launch";
+        completion = [
+          {
+            name = "entrypoint";
+            completion = "filename";
+            default = ".";
+          }
+        ];
+        args = {
+          type = "node";
+          program = "{0}";
+          sourceMaps = true;
+          skipFiles = [ "<node_internals>/**" ];
+        };
+      }
+    ];
+  };
+in
+
 {
   home.packages = with pkgs; [
     rustc
@@ -14,8 +52,9 @@
     golangci-lint-langserver
     delve
 
-    zig_0_15
+    zig_0_16
     zls
+    bazelisk
 
     nil
     nixd
@@ -32,8 +71,13 @@
     ty
     ruff
     python313Packages.debugpy
-    python313Packages.jedi-language-server
+    # python313Packages.jedi-language-server
     python313Packages.python-lsp-server
+
+    typescript-language-server
+    typescript
+    vscode-js-debug
+    prettier
   ];
 
   programs.helix = {
@@ -69,6 +113,24 @@
     # };
 
     languages.language = [
+      {
+        name = "zig";
+        roots = [
+          "build.zig"
+          "build.zig.zon"
+          "MODULE.bazel"
+          "WORKSPACE"
+          "WORKSPACE.bazel"
+          ".git"
+        ];
+        auto-format = true;
+        formatter.command = "zig";
+        formatter.args = [
+          "fmt"
+          "--stdin"
+        ];
+        language-servers = [ "zls" ];
+      }
       {
         name = "go";
         roots = [
@@ -178,6 +240,34 @@
             }
           ];
         };
+      }
+      {
+        name = "javascript";
+        auto-format = true;
+        formatter = prettierFormatter "babel";
+        language-servers = [ "typescript-language-server" ];
+        debugger = jsDebugger;
+      }
+      {
+        name = "jsx";
+        auto-format = true;
+        formatter = prettierFormatter "babel";
+        language-servers = [ "typescript-language-server" ];
+        debugger = jsDebugger;
+      }
+      {
+        name = "typescript";
+        auto-format = true;
+        formatter = prettierFormatter "typescript";
+        language-servers = [ "typescript-language-server" ];
+        debugger = jsDebugger;
+      }
+      {
+        name = "tsx";
+        auto-format = true;
+        formatter = prettierFormatter "typescript";
+        language-servers = [ "typescript-language-server" ];
+        debugger = jsDebugger;
       }
       {
         name = "cpp";

@@ -3,6 +3,10 @@
 
   home.packages = with pkgs; [
     (nerd-fonts.victor-mono)
+    bun
+    cargo-flamegraph
+    lld
+    lldb
     yabai
     yazi
     gh
