@@ -3,6 +3,9 @@
 
   home.packages = with pkgs; [
     (nerd-fonts.victor-mono)
+    protobuf
+    delve
+    terraform
     bun
     cargo-flamegraph
     lld

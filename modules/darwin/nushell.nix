@@ -12,6 +12,7 @@
         $env.PATH
         | prepend "/etc/profiles/per-user/${config.home.username}/bin"
         | prepend "/run/current-system/sw/bin"
+        | append "/usr/local/bin"
       )
     '';
 
@@ -26,6 +27,8 @@
             direnv export json | from json | default {} | load-env
           }
       ))
+
+      alias lz = lazygit
 
       def --env y [...args] {
         let tmp = (mktemp -t "yazi-cwd.XXXXXX")
