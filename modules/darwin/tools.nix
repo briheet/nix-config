@@ -3,6 +3,7 @@
 
   home.packages = with pkgs; [
     (nerd-fonts.victor-mono)
+    delta
     protobuf
     delve
     terraform

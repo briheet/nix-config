@@ -6,8 +6,8 @@
   programs.alacritty = {
     enable = true;
     # theme = "gruvbox_material_medium_dark";
-    # theme = "ayu_mirage";
-    theme = "solarized_osaka";
+    theme = "ayu_mirage";
+    # theme = "solarized_osaka";
 
     settings = {
       env = {

@@ -10,6 +10,7 @@
     with pkgs;
     [
       kitty
+      iina
       discord
       obsidian
       alacritty
