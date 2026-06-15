@@ -2,14 +2,11 @@
 {
 
   imports = [
-    ../../modules/darwin/kitty.nix
-    ../../modules/darwin/fish.nix
     ../../modules/darwin/nushell.nix
     ../../modules/darwin/tools.nix
     ../../modules/darwin/helix.nix
     ../../modules/darwin/alacritty.nix
     ../../modules/darwin/sketchybar.nix
-    # ../../modules/darwin/zen-browser.nix
     ../../modules/darwin/tmux.nix
     ../../modules/darwin/emacs.nix
   ];
