@@ -6,7 +6,6 @@
     delta
     protobuf
     delve
-    terraform
     bun
     cargo-flamegraph
     lld
@@ -14,7 +13,6 @@
     yabai
     yazi
     gh
-    telegram-desktop
     vim
     git
     nodejs
@@ -28,7 +26,6 @@
     btop
     subversion
     clippy
-    lldb
     obsidian
     pnpm
     hyperfine
