@@ -3,6 +3,7 @@
 
   home.packages = with pkgs; [
     (nerd-fonts.victor-mono)
+    ffmpeg
     delta
     protobuf
     delve
@@ -10,7 +11,6 @@
     cargo-flamegraph
     lld
     lldb
-    yabai
     yazi
     gh
     vim
@@ -22,7 +22,6 @@
     ripgrep
     ranger
     tree
-    vscode
     btop
     subversion
     clippy

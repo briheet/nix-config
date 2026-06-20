@@ -6,9 +6,9 @@
     ../../modules/darwin/tools.nix
     ../../modules/darwin/helix.nix
     ../../modules/darwin/alacritty.nix
-    ../../modules/darwin/sketchybar.nix
     ../../modules/darwin/tmux.nix
     ../../modules/darwin/emacs.nix
+    ../../modules/darwin/aerospace.nix
   ];
 
   home.username = "briheet";

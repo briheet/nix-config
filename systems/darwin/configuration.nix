@@ -2,7 +2,7 @@
 
 { pkgs, inputs, ... }:
 {
-  # Unfree packages (Vscode, obsidian)
+  # Unfree packages (obsidian)
   nixpkgs.config.allowUnfree = true;
 
   # Package bundle .app
@@ -29,7 +29,7 @@
 
   # Environment
   environment = {
-    shells = [ pkgs.fish ];
+    shells = [ pkgs.nushell ];
   };
 
   # Networking
@@ -61,7 +61,6 @@
   # Global programs
   programs = {
     direnv.enable = true;
-    fish.enable = true;
   };
 
   # Systems
@@ -75,7 +74,7 @@
       AppleShowAllExtensions = true;
       AppleShowAllFiles = true;
       AppleShowScrollBars = "WhenScrolling";
-      _HIHideMenuBar = true;
+      # _HIHideMenuBar = true;
     };
 
     # Dock stuff
