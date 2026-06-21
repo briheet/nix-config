@@ -5,7 +5,6 @@
 
   programs.alacritty = {
     enable = true;
-    # theme = "gruvbox_material_medium_dark";
     theme = "ayu_mirage";
     # theme = "solarized_osaka";
 
@@ -18,13 +17,12 @@
       };
 
       window = {
-        opacity = 0.9;
-        blur = true;
-        decorations = "Full";
+        opacity = 0.8;
+        blur = false;
+        decorations = "None";
       };
 
       terminal = {
-        # shell = "${pkgs.fish}/bin/fish";
         shell = "${pkgs.nushell}/bin/nu";
       };
 
