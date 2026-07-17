@@ -19,7 +19,7 @@
       window = {
         opacity = 0.8;
         blur = false;
-        decorations = "None";
+        # decorations = "None";
       };
 
       terminal = {

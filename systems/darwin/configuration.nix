@@ -74,7 +74,7 @@
       AppleShowAllExtensions = true;
       AppleShowAllFiles = true;
       AppleShowScrollBars = "WhenScrolling";
-      # _HIHideMenuBar = true;
+      _HIHideMenuBar = true;
     };
 
     # Dock stuff

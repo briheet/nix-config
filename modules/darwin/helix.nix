@@ -1,15 +1,13 @@
 { pkgs, lib, ... }:
 
 let
-  prettierFormatter =
-    parser:
-    {
-      command = "prettier";
-      args = [
-        "--parser"
-        parser
-      ];
-    };
+  prettierFormatter = parser: {
+    command = "prettier";
+    args = [
+      "--parser"
+      parser
+    ];
+  };
 
   jsDebugger = {
     name = "js-debug";
@@ -101,7 +99,7 @@ in
       everforest_dark_transparent = {
         inherits = "everforest_dark";
 
-        "ui.background" = "none";
+        "ui.background" = { };
       };
     };
 

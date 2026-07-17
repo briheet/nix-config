@@ -3,6 +3,9 @@
 
   home.packages = with pkgs; [
     (nerd-fonts.victor-mono)
+    graphviz
+    pkg-config
+    hwloc
     ffmpeg
     delta
     protobuf

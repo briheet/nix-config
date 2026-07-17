@@ -2,9 +2,8 @@
 {
 
   programs.aerospace = {
-    enable = true;
+    enable = false;
     launchd.enable = true;
-
   };
 
 }
