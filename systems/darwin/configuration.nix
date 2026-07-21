@@ -14,6 +14,7 @@
       discord
       obsidian
       alacritty
+      inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.twilight
     ]
     ++ [
       inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex

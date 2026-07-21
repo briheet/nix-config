@@ -10,6 +10,7 @@
     ../../modules/darwin/emacs.nix
     ../../modules/darwin/aerospace.nix
     ../../modules/darwin/sketchybar.nix
+    ../../modules/darwin/zen-browser.nix
   ];
 
   home.username = "briheet";
