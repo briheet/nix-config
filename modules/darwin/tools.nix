@@ -3,6 +3,9 @@
 
   home.packages = with pkgs; [
     (nerd-fonts.victor-mono)
+    # For now just add for zed
+    railway
+    devenv
     graphviz
     pkg-config
     hwloc
@@ -28,7 +31,7 @@
     btop
     subversion
     clippy
-    obsidian
+    # obsidian
     pnpm
     hyperfine
     direnv

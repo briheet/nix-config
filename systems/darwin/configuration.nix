@@ -6,19 +6,16 @@
   nixpkgs.config.allowUnfree = true;
 
   # Package bundle .app
-  environment.systemPackages =
-    with pkgs;
-    [
-      kitty
-      iina
-      discord
-      obsidian
-      alacritty
-      inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.twilight
-    ]
-    ++ [
-      inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex
-    ];
+  environment.systemPackages = with pkgs; [
+    kitty
+    iina
+    discord
+    # obsidian
+    alacritty
+    inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.twilight
+    inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex
+    inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.opencode
+  ];
 
   # System docs
   documentation = {

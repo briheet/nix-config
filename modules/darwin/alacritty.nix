@@ -5,8 +5,8 @@
 
   programs.alacritty = {
     enable = true;
-    theme = "ayu_mirage";
-    # theme = "solarized_osaka";
+    # theme = "ayu_mirage";
+    theme = "solarized_osaka";
 
     settings = {
       env = {
@@ -17,8 +17,8 @@
       };
 
       window = {
-        opacity = 0.8;
-        blur = false;
+        # opacity = 0.8;
+        # blur = true;
         # decorations = "None";
       };
 

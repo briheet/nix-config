@@ -15,6 +15,10 @@
 
     # llm latest via numtide
     llm-agents.url = "github:numtide/llm-agents.nix";
+
+    # Disko stuff
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -25,7 +29,10 @@
       ...
     }:
     {
+
       darwinConfigurations = {
+
+        # M4pro macos system config;
         makima = darwin.lib.darwinSystem {
           system = "aarch64-darwin";
           specialArgs = { inherit inputs; };
@@ -41,6 +48,41 @@
               home-manager.extraSpecialArgs = { inherit inputs; };
               home-manager.users.briheet = import ./systems/darwin/home.nix;
             }
+          ];
+        };
+      };
+
+      nixosConfigurations = {
+
+        # Zangetsu vm config
+        zangetsu = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          specialArgs = { inherit inputs; };
+          modules = [
+            ./systems/linux/configuration.nix
+
+            # Integrate Home Manager
+            home-manager.nixosModules.home-manager
+            {
+              home-manager.useGlobalPkgs = true;
+              home-manager.useUserPackages = true;
+              home-manager.backupFileExtension = "backup";
+              home-manager.extraSpecialArgs = { inherit inputs; };
+              home-manager.users.briheet = import ./systems/linux/home.nix;
+            }
+          ];
+        };
+
+        # Temp: You can use this to install nixos on remote machines;
+        # Uses nixos-anywhere
+        # Nixos anywhere setup
+        vm = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          specialArgs = { inherit inputs; };
+          modules = [
+            inputs.disko.nixosModules.disko
+            ./systems/hetzner/configuration.nix
+            ./systems/hetzner/disko-config.nix
           ];
         };
       };
