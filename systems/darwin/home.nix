@@ -11,6 +11,7 @@
     ../../modules/darwin/aerospace.nix
     ../../modules/darwin/sketchybar.nix
     ../../modules/darwin/zen-browser.nix
+    ../../modules/darwin/ghostty.nix
   ];
 
   home.username = "briheet";

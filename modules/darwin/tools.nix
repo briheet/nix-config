@@ -4,6 +4,7 @@
   home.packages = with pkgs; [
     (nerd-fonts.victor-mono)
     # For now just add for zed
+    glow
     railway
     devenv
     graphviz

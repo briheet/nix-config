@@ -6,13 +6,13 @@
   programs.alacritty = {
     enable = true;
     # theme = "ayu_mirage";
-    theme = "solarized_osaka";
+    # theme = "solarized_osaka";
+    theme = "linux";
 
     settings = {
       env = {
         TERM = "xterm-256color";
         TERM_PROGRAM = "Alacritty";
-        # SHELL = "${pkgs.fish}/bin/fish";
         SHELL = "${pkgs.nushell}/bin/nu";
       };
 

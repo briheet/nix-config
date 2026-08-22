@@ -29,6 +29,8 @@
           }
       ))
 
+      $env.config.show_banner = false
+
       alias lz = lazygit
 
       def --env y [...args] {
