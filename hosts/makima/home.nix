@@ -7,6 +7,7 @@
     ../../modules/common/wallpaper.nix
     ../../modules/common/sketchybar.nix
     ../../modules/common/ghostty.nix
+    ../../modules/common/zellij.nix
   ];
 
   home.username = "briheet";
