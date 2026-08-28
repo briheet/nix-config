@@ -26,7 +26,7 @@ in
       ];
 
       RunAtLoad = true;
-      StartInterval = 1800;
+      StartInterval = 300;
     };
   };
 
