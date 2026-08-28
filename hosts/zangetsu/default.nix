@@ -1,14 +1,19 @@
+{ pkgs, inputs, ... }:
 {
-  inputs,
-  pkgs,
-  ...
-}:
 
-{
   imports = [
     inputs.disko.nixosModules.disko
     ../hetzner/configuration.nix
   ];
+
+  home-manager = {
+    useGlobalPkgs = true;
+    useUserPackages = true;
+    backupFileExtension = "backup";
+    extraSpecialArgs = { inherit inputs; };
+
+    users.briheet = import ./home.nix;
+  };
 
   nixpkgs.config.allowUnfree = true;
 

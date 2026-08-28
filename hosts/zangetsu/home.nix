@@ -2,9 +2,9 @@
 
 {
   imports = [
-    ../../modules/linux/helix.nix
-    ../../modules/linux/nushell.nix
-    ../../modules/linux/tmux.nix
+    ../../modules/common/helix.nix
+    ../../modules/common/nushell.nix
+    ../../modules/common/tmux.nix
   ];
 
   home = {

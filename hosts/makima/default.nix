@@ -1,21 +1,24 @@
-# Macos level configuration.
-
+# This file contains macos system specific behaviour
 { pkgs, inputs, ... }:
 {
-  # Unfree packages (obsidian)
+  home-manager = {
+    useGlobalPkgs = true;
+    useUserPackages = true;
+    backupFileExtension = "backup";
+    extraSpecialArgs = { inherit inputs; };
+
+    users.briheet = import ./home.nix;
+  };
+
+  # Discord
   nixpkgs.config.allowUnfree = true;
 
   # Package bundle .app
   environment.systemPackages = with pkgs; [
-    kitty
-    iina
     discord
-    # obsidian
-    alacritty
     ghostty-bin
     inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.twilight
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex
-    inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.opencode
   ];
 
   # System docs
@@ -74,6 +77,9 @@
       AppleShowAllFiles = true;
       AppleShowScrollBars = "WhenScrolling";
       _HIHideMenuBar = true;
+
+      # Inverse scrolling
+      "com.apple.swipescrolldirection" = false;
     };
 
     # Dock stuff
@@ -83,6 +89,12 @@
     keyboard = {
       enableKeyMapping = true;
       remapCapsLockToEscape = true;
+    };
+
+    # Trackpad stuff
+    defaults.trackpad = {
+      Clicking = true;
+      TrackpadRightClick = true;
     };
   };
 
