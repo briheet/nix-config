@@ -1,7 +1,9 @@
 { lib, pkgs, ... }:
 
 let
-  delta = "${lib.getExe pkgs.delta} --dark --paging=never --syntax-theme=Nord";
+  # delta >= 0.19 bundles the official Catppuccin bat themes.
+  # Previously: --syntax-theme=Nord
+  delta = "${lib.getExe pkgs.delta} --dark --paging=never --syntax-theme='Catppuccin Mocha'";
 in
 {
   programs.lazygit = {
@@ -25,25 +27,40 @@ in
         scrollOffMargin = 5;
         wrapLinesInStagingView = true;
 
+        # Catppuccin Mocha (https://github.com/catppuccin/lazygit)
+        #
+        # Nord (previous theme):
+        #   activeBorderColor = [ "#88c0d0" "bold" ];
+        #   inactiveBorderColor = [ "#4c566a" ];
+        #   searchingActiveBorderColor = [ "#ebcb8b" "bold" ];
+        #   optionsTextColor = [ "#81a1c1" ];
+        #   selectedLineBgColor = [ "#3b4252" ];
+        #   inactiveViewSelectedLineBgColor = [ "#3b4252" ];
+        #   defaultFgColor = [ "#d8dee9" ];
+        #   unstagedChangesColor = [ "#bf616a" ];
+        #   cherryPickedCommitFgColor = [ "#8fbcbb" ];
+        #   cherryPickedCommitBgColor = [ "#434c5e" ];
+        #   markedBaseCommitFgColor = [ "#ebcb8b" ];
+        #   markedBaseCommitBgColor = [ "#434c5e" ];
         theme = {
           activeBorderColor = [
-            "#88c0d0"
+            "#a6e3a1" # green
             "bold"
           ];
-          inactiveBorderColor = [ "#4c566a" ];
+          inactiveBorderColor = [ "#a6adc8" ]; # subtext0
           searchingActiveBorderColor = [
-            "#ebcb8b"
+            "#f9e2af" # yellow
             "bold"
           ];
-          optionsTextColor = [ "#81a1c1" ];
-          selectedLineBgColor = [ "#3b4252" ];
-          inactiveViewSelectedLineBgColor = [ "#3b4252" ];
-          defaultFgColor = [ "#d8dee9" ];
-          unstagedChangesColor = [ "#bf616a" ];
-          cherryPickedCommitFgColor = [ "#8fbcbb" ];
-          cherryPickedCommitBgColor = [ "#434c5e" ];
-          markedBaseCommitFgColor = [ "#ebcb8b" ];
-          markedBaseCommitBgColor = [ "#434c5e" ];
+          optionsTextColor = [ "#89b4fa" ]; # blue
+          selectedLineBgColor = [ "#313244" ]; # surface0
+          inactiveViewSelectedLineBgColor = [ "#313244" ]; # surface0
+          defaultFgColor = [ "#cdd6f4" ]; # text
+          unstagedChangesColor = [ "#f38ba8" ]; # red
+          cherryPickedCommitFgColor = [ "#89b4fa" ]; # blue
+          cherryPickedCommitBgColor = [ "#45475a" ]; # surface1
+          markedBaseCommitFgColor = [ "#f9e2af" ]; # yellow
+          markedBaseCommitBgColor = [ "#45475a" ]; # surface1
         };
       };
 
@@ -54,12 +71,12 @@ in
         # Cycle with Lazygit's existing renderer binding (|).
         diffRenderers = [
           {
-            name = "Nord unified";
+            name = "Catppuccin unified"; # was: Nord unified
             colorArg = "always";
             command = "${delta} --line-numbers";
           }
           {
-            name = "Nord side-by-side";
+            name = "Catppuccin side-by-side"; # was: Nord side-by-side
             colorArg = "always";
             command = "${delta} --side-by-side --line-numbers";
           }

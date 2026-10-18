@@ -5,6 +5,7 @@
     (nerd-fonts.victor-mono)
     # For now just add for zed
     awscli2
+    cf-tool
     glow
     railway
     devenv
@@ -17,6 +18,7 @@
     delve
     bun
     cargo-flamegraph
+    cf-tool
     lld
     lldb
     gh

@@ -2,7 +2,12 @@
 
 let
   # Our work projects use Elixir 1.20 on OTP 28.
-  elixir = pkgs.beam.packages.erlang_28.elixir_1_20;
+  # elixir = pkgs.beam.packages.erlang_28.elixir_1_20;
+
+  # nixpkgs patches ElixirLS's launcher to pin the Elixir it was built with.
+  # Drop that patch so the upstream launcher picks up whichever Elixir the
+  # project resolves to (asdf, mise or PATH) and compiles ElixirLS for it.
+  elixirLs = pkgs.elixir-ls.overrideAttrs { patches = [ ]; };
 
   prettierFormatter = parser: {
     command = "prettier";
@@ -68,8 +73,8 @@ in
     ocamlPackages.earlybird
 
     # Elixir
-    elixir
-    dexter
+    beamPackages.elixir
+    elixirLs
 
     # Python
     python313
@@ -88,16 +93,23 @@ in
   programs.helix = {
     enable = true;
     defaultEditor = true;
-    # Keep Nord's palette; let Ghostty's existing transparency show through.
-    themes.nord-transparent = {
-      inherits = "nord";
+    # Keep the theme's palette; let Ghostty's existing transparency show through.
+    # Nord (previous theme):
+    # themes.nord-transparent = {
+    #   inherits = "nord";
+    #   "ui.background" = { };
+    # };
+    themes.catppuccin_mocha-transparent = {
+      inherits = "catppuccin_mocha";
       "ui.background" = { };
     };
 
     settings = {
-      theme = "nord-transparent";
+      # theme = "nord-transparent";
+      theme = "catppuccin_mocha-transparent";
       keys.normal.space.F = "file_picker_in_current_buffer_directory";
       editor = {
+        # rulers = [ 80 ];
         line-number = "relative";
         lsp.display-messages = true;
         cursor-shape = {
@@ -111,15 +123,31 @@ in
     languages.language = [
       {
         name = "elixir";
-        language-servers = [ "dexter" ];
+        roots = [
+          "mix.exs"
+          ".git"
+        ];
+        # elixir-ls formats via `mix format`, honouring the project's .formatter.exs.
+        auto-format = true;
+        language-servers = [ "elixir-ls" ];
       }
       {
         name = "heex";
-        language-servers = [ "dexter" ];
+        roots = [
+          "mix.exs"
+          ".git"
+        ];
+        # No auto-format on HEEx templates.
+        language-servers = [ "elixir-ls" ];
       }
       {
         name = "eex";
-        language-servers = [ "dexter" ];
+        roots = [
+          "mix.exs"
+          ".git"
+        ];
+        # No auto-format: same as heex.
+        language-servers = [ "elixir-ls" ];
       }
       {
         name = "zig";
@@ -296,10 +324,16 @@ in
       ];
     };
 
-    # Dexter indexes source directly, without waiting for a Mix build.
-    languages.language-server.dexter = {
-      command = lib.getExe pkgs.dexter;
-      args = [ "lsp" ];
+    # ElixirLS may be busy compiling native dependencies on its initial build.
+    # Give navigation requests enough time to complete and avoid dependency
+    # fetching races between the editor and the project's Mix workflow.
+    languages.language-server.elixir-ls = {
+      command = lib.getExe elixirLs;
+      timeout = 120;
+      config.elixirLS = {
+        dialyzerEnabled = false;
+        fetchDeps = false;
+      };
     };
 
     languages.language-server.zls = {

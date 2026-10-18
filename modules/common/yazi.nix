@@ -1,4 +1,18 @@
 { pkgs, ... }:
+let
+  # Official Catppuccin Mocha flavor from the Yazi flavor collection.
+  # https://github.com/yazi-rs/flavors
+  catppuccin-mocha-flavor =
+    let
+      src = pkgs.fetchFromGitHub {
+        owner = "yazi-rs";
+        repo = "flavors";
+        rev = "20b47bfd78880c2674899597fd26bc01b21ff48c";
+        hash = "sha256-NGnfrQdsnQITKCZ0oh6DCxeCR2ozJoPAZetsi3ghHAI=";
+      };
+    in
+    "${src}/catppuccin-mocha.yazi";
+in
 {
   programs.yazi = {
     enable = true;
@@ -8,10 +22,16 @@
 
     extraPackages = [ pkgs.glow ];
 
-    flavors.nord = pkgs.yaziPlugins.nord;
+    # Nord (previous theme):
+    # flavors.nord = pkgs.yaziPlugins.nord;
+    # theme.flavor = {
+    #   dark = "nord";
+    #   light = "nord";
+    # };
+    flavors.catppuccin-mocha = catppuccin-mocha-flavor;
     theme.flavor = {
-      dark = "nord";
-      light = "nord";
+      dark = "catppuccin-mocha";
+      light = "catppuccin-mocha";
     };
 
     plugins = {
@@ -28,8 +48,8 @@
     ];
 
     settings = {
-      # Parent directory, file list, preview: give previews half the window.
-      mgr.ratio = [ 1 3 4 ];
+      # Parent directory, file list, preview: keep the file list narrow so previews get most of the window.
+      mgr.ratio = [ 1 2 5 ];
       preview = {
         wrap = "yes";
         tab_size = 2;

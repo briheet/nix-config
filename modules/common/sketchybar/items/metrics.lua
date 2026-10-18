@@ -9,7 +9,7 @@ local function metric(name, title, frequency)
     padding_right = 3,
     icon = {
       string = title,
-      color = colors.nord9,
+      color = colors.blue,
       font = { family = settings.label_font, style = "Semibold", size = 11.0 },
       y_offset = settings.label_y_offset,
     },
@@ -76,7 +76,7 @@ local memory = metric("memory", "RAM", 10)
 local function update_memory()
   sbar.exec("/usr/sbin/sysctl -n kern.memorystatus_vm_pressure_level hw.memsize && /usr/bin/vm_stat", function(output, code)
     -- sysctl exposes NOTE_MEMORYSTATUS_PRESSURE_* flags, not a RAM percentage.
-    local palette = { [1] = colors.nord14, [2] = colors.nord13, [4] = colors.nord11 }
+    local palette = { [1] = colors.green, [2] = colors.yellow, [4] = colors.red }
     local pressure, total, stats = (output or ""):match("^(%d+)%s+(%d+)%s+(.*)")
     local color = code == 0 and palette[tonumber(pressure)]
     local value = "--"

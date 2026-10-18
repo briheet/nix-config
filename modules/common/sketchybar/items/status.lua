@@ -46,7 +46,7 @@ local battery = sbar.add("item", "status.battery", {
   update_freq = 120,
   icon = {
     string = icons.battery.high,
-    color = colors.nord14,
+    color = colors.green,
   },
   label = {
     string = "--%",
@@ -68,23 +68,23 @@ local function update_battery()
     local state = helpers.trim((info or ""):match("%d+%%;%s*([^;]+)") or "")
     local charging = state == "charging"
     local icon = icons.battery.empty
-    local color = colors.nord11
+    local color = colors.red
 
     if charging then
       icon = icons.battery.charging
-      color = colors.nord14
+      color = colors.green
     elseif percentage > 85 then
       icon = icons.battery.full
-      color = colors.nord14
+      color = colors.green
     elseif percentage > 60 then
       icon = icons.battery.high
-      color = colors.nord7
+      color = colors.teal
     elseif percentage > 35 then
       icon = icons.battery.medium
-      color = colors.nord7
+      color = colors.teal
     elseif percentage > 15 then
       icon = icons.battery.low
-      color = colors.nord13
+      color = colors.yellow
     end
 
     battery:set({
@@ -105,7 +105,7 @@ local volume = sbar.add("item", "status.volume", {
   update_freq = 30,
   icon = {
     string = icons.volume.medium,
-    color = colors.nord7,
+    color = colors.teal,
   },
   label = {
     string = "--",
@@ -152,7 +152,7 @@ local network = sbar.add("item", "status.network", {
   update_freq = 60,
   icon = {
     string = icons.wifi.connected,
-    color = colors.nord9,
+    color = colors.blue,
   },
   label = { string = "Wi-Fi", drawing = true },
 })
@@ -162,7 +162,7 @@ local function update_network()
     network:set({
       icon = {
         string = connected and icons.wifi.connected or icons.wifi.disconnected,
-        color = connected and colors.nord9 or colors.nord11,
+        color = connected and colors.blue or colors.red,
       },
       label = { string = label },
     })

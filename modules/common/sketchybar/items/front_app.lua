@@ -8,7 +8,7 @@ local front_app = sbar.add("item", "front_app", {
   padding_right = 6,
   icon = {
     string = icons.app,
-    color = colors.nord9,
+    color = colors.blue,
     padding_left = 0,
   },
   label = {
@@ -34,4 +34,4 @@ front_app:subscribe("forced", function()
   )
 end)
 
-helpers.hover(front_app, colors.nord9)
+helpers.hover(front_app, colors.blue)
