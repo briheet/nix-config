@@ -1,13 +1,47 @@
 { pkgs, lib, ... }:
 
 let
-  # Our work projects use Elixir 1.20 on OTP 28.
-  # elixir = pkgs.beam.packages.erlang_28.elixir_1_20;
+  expert =
+    let
+      version = "0.2.2";
+      assets = {
+        aarch64-darwin = {
+          name = "expert_darwin_arm64";
+          hash = "sha256-Bx6glOUAo/Kta387FjRlDWBhsR+O+Yp7/pcmUGMZxYI=";
+        };
+        x86_64-darwin = {
+          name = "expert_darwin_amd64";
+          hash = "sha256-d6T/sscOVoHz6N4o0cRX3actXdeCbEPBNIZS6xf+HpE=";
+        };
+        x86_64-linux = {
+          name = "expert_linux_amd64";
+          hash = "sha256-Rh21r0afWljXJ2JPJl3L1htFrDFeeQlyijUPu+CcLHA=";
+        };
+        aarch64-linux = {
+          name = "expert_linux_arm64";
+          hash = "sha256-hSQJ+e3t9OZTw6/3CKDfyW11etDoe0+/SVbGl+HgX70=";
+        };
+      };
+      asset = assets.${pkgs.stdenv.hostPlatform.system};
+      binary = pkgs.fetchurl {
+        url = "https://github.com/expert-lsp/expert/releases/download/v${version}/${asset.name}";
+        inherit (asset) hash;
+      };
+    in
+    pkgs.runCommand "expert-${version}" { meta.mainProgram = "expert"; } ''
+      install -Dm755 ${binary} $out/bin/expert
+    '';
 
-  # nixpkgs patches ElixirLS's launcher to pin the Elixir it was built with.
-  # Drop that patch so the upstream launcher picks up whichever Elixir the
-  # project resolves to (asdf, mise or PATH) and compiles ElixirLS for it.
-  elixirLs = pkgs.elixir-ls.overrideAttrs { patches = [ ]; };
+  expertShell = pkgs.writeShellScript "expert-shell" ''
+    cd "$EXPERT_PROJECT_ROOT" && eval "$(${lib.getExe pkgs.direnv} export bash 2>/dev/null)"
+    exec ${lib.getExe pkgs.bash} --noprofile --norc -c "''${@: -1}"
+  '';
+
+  expertElixir = pkgs.beamPackages.elixir_1_19.overrideAttrs (old: {
+    env = old.env // {
+      ERL_COMPILER_OPTIONS = "[debug_info]";
+    };
+  });
 
   prettierFormatter = parser: {
     command = "prettier";
@@ -52,7 +86,6 @@ in
     cargo
 
     gopls
-    go_1_25
     goperf
     golangci-lint
     golangci-lint-langserver
@@ -72,9 +105,7 @@ in
     ocamlformat
     ocamlPackages.earlybird
 
-    # Elixir
-    beamPackages.elixir
-    elixirLs
+    expert
 
     # Python
     python313
@@ -127,9 +158,8 @@ in
           "mix.exs"
           ".git"
         ];
-        # elixir-ls formats via `mix format`, honouring the project's .formatter.exs.
         auto-format = true;
-        language-servers = [ "elixir-ls" ];
+        language-servers = [ "expert" ];
       }
       {
         name = "heex";
@@ -137,8 +167,7 @@ in
           "mix.exs"
           ".git"
         ];
-        # No auto-format on HEEx templates.
-        language-servers = [ "elixir-ls" ];
+        language-servers = [ "expert" ];
       }
       {
         name = "eex";
@@ -146,8 +175,7 @@ in
           "mix.exs"
           ".git"
         ];
-        # No auto-format: same as heex.
-        language-servers = [ "elixir-ls" ];
+        language-servers = [ "expert" ];
       }
       {
         name = "zig";
@@ -324,15 +352,15 @@ in
       ];
     };
 
-    # ElixirLS may be busy compiling native dependencies on its initial build.
-    # Give navigation requests enough time to complete and avoid dependency
-    # fetching races between the editor and the project's Mix workflow.
-    languages.language-server.elixir-ls = {
-      command = lib.getExe elixirLs;
+    languages.language-server.expert = {
+      command = lib.getExe expert;
+      args = [ "--stdio" ];
+      environment.SHELL = "${expertShell}";
       timeout = 120;
-      config.elixirLS = {
-        dialyzerEnabled = false;
-        fetchDeps = false;
+      config = {
+        elixirExecutablePath = lib.getExe' expertElixir "elixir";
+        erlangExecutablePath = lib.getExe' pkgs.beamPackages.erlang "erl";
+        elixirSourcePath = "${expertElixir.src}";
       };
     };
 
@@ -344,7 +372,6 @@ in
       ];
     };
 
-    # Surface Go escape analysis / GC hints inline via gopls.
     languages.language-server.gopls.config = {
       "ui.codelenses" = {
         gc_details = true;
@@ -357,7 +384,7 @@ in
 
     languages.language-server.rust-analyzer.config = {
       check.command = "clippy";
-      # cargo.allFeatures = true;
+      cargo.target = "aarch64-unknown-linux-gnu";
     };
 
   };

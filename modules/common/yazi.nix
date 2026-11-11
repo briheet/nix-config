@@ -22,12 +22,6 @@ in
 
     extraPackages = [ pkgs.glow ];
 
-    # Nord (previous theme):
-    # flavors.nord = pkgs.yaziPlugins.nord;
-    # theme.flavor = {
-    #   dark = "nord";
-    #   light = "nord";
-    # };
     flavors.catppuccin-mocha = catppuccin-mocha-flavor;
     theme.flavor = {
       dark = "catppuccin-mocha";
@@ -48,14 +42,16 @@ in
     ];
 
     settings = {
-      # Parent directory, file list, preview: keep the file list narrow so previews get most of the window.
-      mgr.ratio = [ 1 2 5 ];
+      mgr.ratio = [
+        1
+        2
+        5
+      ];
       preview = {
         wrap = "yes";
         tab_size = 2;
       };
 
-      # Keep the built-in code/media previewers; render Markdown with Glow.
       plugin.prepend_previewers = [
         {
           url = "*.md";

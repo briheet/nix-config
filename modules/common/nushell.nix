@@ -1,17 +1,28 @@
-{config, ...}: {
+{
+  config,
+  lib,
+  osConfig ? { },
+  ...
+}:
+{
   programs.nushell = {
     enable = true;
-    extraEnv = ''
-      $env.EDITOR = "hx"
-      $env.VISUAL = "hx"
-      $env.PATH = (
-        $env.PATH
-        | prepend "${config.home.homeDirectory}/.local/bin"
-        | prepend "/etc/profiles/per-user/${config.home.username}/bin"
-        | prepend "/run/current-system/sw/bin"
-        | append "/usr/local/bin"
-      )
-    '';
+    loadSessionVariables = lib.mkDefault false;
+    extraEnv =
+      lib.optionalString (osConfig.programs.direnv.enable or false) ''
+        $env.DIRENV_CONFIG = "/etc/direnv"
+      ''
+      + ''
+        $env.EDITOR = "hx"
+        $env.VISUAL = "hx"
+        $env.PATH = (
+          $env.PATH
+          | prepend "${config.home.homeDirectory}/.local/bin"
+          | prepend "/etc/profiles/per-user/${config.home.username}/bin"
+          | prepend "/run/current-system/sw/bin"
+          | append "/usr/local/bin"
+        )
+      '';
 
     extraConfig = ''
       $env.config.buffer_editor = "hx"
@@ -327,6 +338,27 @@
       $env.config.show_banner = false
 
       alias lz = lazygit
+
+      # Pull a project's changes from the GPU box (~/work/<project>) back to this machine.
+      #   gpu-pull                   # project named after the current directory, synced into it
+      #   gpu-pull kuro -n           # dry run into ~/code/work/kuro
+      def gpu-pull [
+        project?: string   # project under ~/work on the box (default: current directory name)
+        --delete           # also delete local files that no longer exist on the box
+        --dry-run (-n)     # show what would change without copying
+        --git              # include .git (skipped by default so local history is untouched)
+      ] {
+        let host = "t4gpu"   # alias in ~/.ssh/config
+        let name = ($project | default ($env.PWD | path basename))
+        let dest = if $project == null { $env.PWD } else { $env.HOME | path join code work $name }
+
+        mut args = ["-avz" "--progress" "--exclude" "target" "--exclude" ".direnv" "--exclude" "result"]
+        if not $git { $args = ($args | append ["--exclude" ".git"]) }
+        if $delete { $args = ($args | append "--delete") }
+        if $dry_run { $args = ($args | append "--dry-run") }
+
+        ^rsync ...$args $"($host):/home/ubuntu/work/($name)/" $"($dest)/"
+      }
     '';
   };
 }

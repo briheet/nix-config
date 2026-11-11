@@ -22,6 +22,7 @@
     raycast
     shottr
     obsidian
+    zed-editor
     inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.twilight
     # inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex
     inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-code

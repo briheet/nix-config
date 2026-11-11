@@ -3,7 +3,6 @@
 
   home.packages = with pkgs; [
     (nerd-fonts.victor-mono)
-    # For now just add for zed
     awscli2
     cf-tool
     glow

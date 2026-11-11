@@ -70,8 +70,6 @@
         };
 
         # Temp: You can use this to install nixos on remote machines;
-        # Uses nixos-anywhere
-        # Nixos anywhere setup
         vm = nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
           specialArgs = { inherit inputs; };
@@ -79,6 +77,19 @@
             inputs.disko.nixosModules.disko
             ./hosts/hetzner/default.nix
           ];
+        };
+      };
+
+      homeConfigurations = {
+
+        # ubuntu gpu box: standalone home-manager on top of the stock image
+        gpu = home-manager.lib.homeManagerConfiguration {
+          pkgs = import nixpkgs {
+            system = "x86_64-linux";
+            config.allowUnfree = true;
+          };
+          extraSpecialArgs = { inherit inputs; };
+          modules = [ ./hosts/gpu/home.nix ];
         };
       };
 

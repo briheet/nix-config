@@ -6,7 +6,7 @@
     settings = {
       command = "${pkgs.nushell}/bin/nu";
 
-      font-family = "Iosevka Nerd Font";
+      # font-family = "Iosevka Nerd Font";
       font-size = 13;
       # macos-titlebar-style = "hidden";
       cursor-style-blink = false;
@@ -21,7 +21,8 @@
 
       # Theme stuff
       # Previously: theme = "Nord";
-      theme = "Catppuccin Mocha";
+      # theme = "Catppuccin Mocha";
+      theme = "Black Metal";
 
       # Previous custom theme:
       /*

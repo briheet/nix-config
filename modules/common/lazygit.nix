@@ -1,8 +1,6 @@
 { lib, pkgs, ... }:
 
 let
-  # delta >= 0.19 bundles the official Catppuccin bat themes.
-  # Previously: --syntax-theme=Nord
   delta = "${lib.getExe pkgs.delta} --dark --paging=never --syntax-theme='Catppuccin Mocha'";
 in
 {
@@ -14,7 +12,6 @@ in
       os.editPreset = "helix (hx)";
 
       gui = {
-        # Give the diff more room while retaining the standard panels and keys.
         sidePanelWidth = 0.25;
         expandFocusedSidePanel = true;
         expandedSidePanelWeight = 2;
@@ -25,7 +22,7 @@ in
         nerdFontsVersion = "3";
         border = "rounded";
         scrollOffMargin = 5;
-        wrapLinesInStagingView = true;
+        wrapLinesInDiffView = true;
 
         # Catppuccin Mocha (https://github.com/catppuccin/lazygit)
         #

@@ -2,8 +2,6 @@
 
 let
   lua = pkgs.lua5_5;
-  # Upstream's makefile embeds its bundled Lua, ignoring Nix's Lua flags.
-  # Link against the interpreter's runtime so both share the same Lua ABI.
   sbarLua = pkgs.sbarlua.overrideAttrs {
     buildPhase = ''
       runHook preBuild
