@@ -160,6 +160,27 @@
         "type": "github"
       }
     },
+    "nixos-m4pro": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1794581857,
+        "narHash": "sha256-0ZnkK0ze1tB5StwdKuheVO0Lf6AabYCDBI1lUgE9i08=",
+        "owner": "briheet",
+        "repo": "nixos-m4pro",
+        "rev": "7e7a4316debd679b35a9826dc43cf69daf151afc",
+        "type": "github"
+      },
+      "original": {
+        "owner": "briheet",
+        "ref": "nixos-on-ssd",
+        "repo": "nixos-m4pro",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1793977579,
@@ -199,6 +220,7 @@
         "disko": "disko",
         "home-manager": "home-manager",
         "llm-agents": "llm-agents",
+        "nixos-m4pro": "nixos-m4pro",
         "nixpkgs": "nixpkgs_2",
         "zen-browser": "zen-browser"
       }

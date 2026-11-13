@@ -23,6 +23,10 @@
     # Disko stuff
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
+
+    # MacBook Pro M4 Pro (J614s): hardware, boot chain and desktop modules
+    nixos-m4pro.url = "github:briheet/nixos-m4pro/nixos-on-ssd";
+    nixos-m4pro.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -66,6 +70,15 @@
           modules = [
             home-manager.nixosModules.home-manager
             ./hosts/zangetsu/default.nix
+          ];
+        };
+
+        # MacBook Pro M4 Pro (J614s), NixOS on its SSD
+        m4pro = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs; };
+          modules = [
+            home-manager.nixosModules.home-manager
+            ./hosts/m4pro/default.nix
           ];
         };
 
