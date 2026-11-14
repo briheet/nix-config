@@ -108,7 +108,13 @@ in
     # netboot mounts the store image with threads=multi, which Aurora's
     # kernel (single-threaded squashfs, no CHOICE_DECOMP_BY_MOUNT) rejects
     # with EINVAL, so the initrd never got its /nix/store (2026-11-15).
-    fileSystems."/nix/.ro-store".options = lib.mkForce [ "loop" ];
+    # (netboot overrides the whole entry, so this replaces the whole entry.)
+    fileSystems."/nix/.ro-store" = lib.mkForce {
+      fsType = "squashfs";
+      device = "../nix-store.squashfs";
+      options = [ "loop" ];
+      neededForBoot = true;
+    };
     # A failure in this image's initrd opens a root shell, not a locked one.
     boot.initrd.systemd.emergencyAccess = true;
 
