@@ -2,7 +2,7 @@
   programs.ghostty = {
     enable = true;
     # ghostty-bin is the macOS app; Linux builds ghostty itself.
-    package = if pkgs.stdenv.isDarwin then pkgs.ghostty-bin else pkgs.ghostty;
+    package = if pkgs.stdenv.hostPlatform.isDarwin then pkgs.ghostty-bin else pkgs.ghostty;
 
     settings = {
       command = "${pkgs.nushell}/bin/nu";

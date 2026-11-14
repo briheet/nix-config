@@ -34,7 +34,14 @@
       "root"
       "@wheel"
     ];
+    # `nixpkgs` resolves to the nixpkgs this system was built from (the
+    # system registry NixOS writes), without downloading the global
+    # registry: `nix shell nixpkgs#...` works offline and stays pinned.
+    flake-registry = "";
   };
+
+  # No channels: NIX_PATH becomes nixpkgs=flake:nixpkgs, the same pin.
+  nix.channel.enable = false;
 
   networking.hostName = "m4pro";
   time.timeZone = "Asia/Kolkata";
