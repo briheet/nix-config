@@ -54,6 +54,11 @@
 
   environment.shells = [ pkgs.nushell ];
 
+  # Caps Lock is Escape on the text consoles and the login screen too
+  # (Hyprland sets the same in modules/linux/hyprland.lua).
+  services.xserver.xkb.options = "caps:escape";
+  console.useXkbConfig = true;
+
   services.openssh = {
     enable = true;
     settings = {
