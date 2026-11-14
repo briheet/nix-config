@@ -17,10 +17,10 @@
 # On the ESP:
 #   m1n1/boot-ctxr.bin        Stage 2, what Stage 1 loads
 #   m1n1/boot-ctxr.bin.prev   the Stage 2 it replaced (copy back from recoveryOS)
-#   aura/stage1.macho.gz      Stage 1 for this generation, .md5 of the unpacked
-#                             object, stage1.version its tag
+#   aura/stage1.macho         Stage 1 for this generation (padded, 153 MB),
+#                             its .md5, stage1.version its tag
 #   aura/enroll-stage1.sh     aura's enroll script
-#   aura/install-stage1.sh    unpacks stage1.macho and runs it (recoveryOS)
+#   aura/install-stage1.sh    enrolls stage1.macho (recoveryOS)
 #   aura-proxy                (touch it) Stage 1 waits for a host on USB: the
 #                             aura proxy, for tethered work
 { config, lib, pkgs, inputs, ... }:
@@ -58,9 +58,6 @@ let
     [ $# -gt 0 ] || set -- --no-rollback
 
     echo "aura Stage 1 $(cat "$dir/stage1.version") for $volume"
-    echo "Unpacking the padded boot object (about 150 MB) next to it..."
-    gunzip -c "$dir/stage1.macho.gz" > "$dir/stage1.macho"
-    trap 'rm -f "$dir/stage1.macho"' EXIT
     bash "$dir/enroll-stage1.sh" --compress "$@" "$volume" "$dir/stage1.macho" "$(cat "$dir/stage1.macho.md5")"
   '';
 
@@ -120,7 +117,7 @@ in
       # tree: for seeding a new ESP from macOS (flake package j614s-esp).
       auraEsp = pkgs.runCommand "j614s-aura-esp" { } ''
         install -Dm644 ${stage2}/boot-ctxr.bin $out/m1n1/boot-ctxr.bin
-        install -Dm644 ${stage1}/stage1.macho.gz $out/aura/stage1.macho.gz
+        install -Dm644 ${stage1}/stage1.macho $out/aura/stage1.macho
         install -Dm644 ${stage1}/stage1.macho.md5 $out/aura/stage1.macho.md5
         install -Dm644 ${stage1}/enroll-stage1.sh $out/aura/enroll-stage1.sh
         install -Dm644 ${installStage1} $out/aura/install-stage1.sh
@@ -182,7 +179,8 @@ in
         fi
         put ${stage2}/boot-ctxr.bin /boot/m1n1/boot-ctxr.bin
 
-        put ${stage1}/stage1.macho.gz /boot/aura/stage1.macho.gz
+        put ${stage1}/stage1.macho /boot/aura/stage1.macho
+        rm -f /boot/aura/stage1.macho.gz
         put ${stage1}/stage1.macho.md5 /boot/aura/stage1.macho.md5
         put ${stage1}/enroll-stage1.sh /boot/aura/enroll-stage1.sh
         put ${installStage1} /boot/aura/install-stage1.sh
