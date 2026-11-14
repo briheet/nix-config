@@ -10,6 +10,12 @@
 
 {
   hardware.firmware = [ (pkgs.callPackage ./pkgs/j614s-firmware.nix { }) ];
+
+  # Our patches on top of nixos-aurora's kernel (./kernel-patches/*.patch, in
+  # name order). None means Aurora's cached kernel is used as is.
+  boot.kernelPatches = map (name: { inherit name; patch = ./kernel-patches + "/${name}"; })
+    (lib.sort lib.lessThan (lib.filter (lib.hasSuffix ".patch")
+      (builtins.attrNames (builtins.readDir ./kernel-patches))));
   # The keyboard and trackpad probe in the initrd.
   boot.initrd.extraFirmwarePaths = [ "apple/tpmtfw-j614s.bin" ];
 
