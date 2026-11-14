@@ -74,11 +74,11 @@
         };
 
         # MacBook Pro M4 Pro (J614s), NixOS on its SSD
-        m4pro = nixpkgs.lib.nixosSystem {
+        kyokasuigetsu = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs; };
           modules = [
             home-manager.nixosModules.home-manager
-            ./hosts/m4pro/default.nix
+            ./hosts/kyokasuigetsu/default.nix
           ];
         };
 

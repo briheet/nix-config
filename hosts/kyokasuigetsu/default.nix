@@ -5,7 +5,7 @@
 # from its nixosModules.desktop. Everything here is this machine's own policy.
 #
 # On the Mac:
-#   sudo nixos-rebuild switch --flake github:briheet/nix-config#m4pro
+#   sudo nixos-rebuild switch --flake github:briheet/nix-config#kyokasuigetsu
 { pkgs, inputs, ... }:
 {
   imports = [
@@ -56,7 +56,7 @@
   ];
   nix.optimise.automatic = true;
 
-  networking.hostName = "m4pro";
+  networking.hostName = "kyokasuigetsu";
   time.timeZone = "Asia/Kolkata";
 
   # Installed as 26.05 by nixos-m4pro; keep it.

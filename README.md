@@ -19,14 +19,14 @@ nix run github:nix-community/nixos-anywhere -- --build-on remote --flake .#vm --
 nix run nixpkgs#nixos-rebuild -- --flake .#zangetsu --build-host zangetsu --target-host zangetsu switch
 ```
 
-NixOS on the MacBook Pro M4 Pro, `m4pro`. The hardware, the SSD layout and the boot chain (m1n1 → U-Boot → extlinux) come from [nixos-m4pro](https://github.com/briheet/nixos-m4pro), which also does the first install; this repo is the machine's own config. On the Mac:
+NixOS on the MacBook Pro M4 Pro, `kyokasuigetsu`. The hardware, the SSD layout and the boot chain (m1n1 → U-Boot → extlinux) come from [nixos-m4pro](https://github.com/briheet/nixos-m4pro), which also does the first install; this repo is the machine's own config. On the Mac:
 ```bash
 git clone git@github.com:briheet/nix-config.git ~/nix-config
 cd ~/nix-config
-sudo nixos-rebuild switch --flake .#m4pro      # each change; persists across reboots
+sudo nixos-rebuild switch --flake .#kyokasuigetsu      # each change; persists across reboots
 
 nix flake update nixos-m4pro                   # newer kernel, firmware or boot chain
-sudo nixos-rebuild switch --flake .#m4pro
+sudo nixos-rebuild switch --flake .#kyokasuigetsu
 ```
 Every switch adds a generation to U-Boot's boot menu; the older ones stay there as fallbacks. The Apple firmware (trackpad, Wi-Fi, Bluetooth) is a fixed-output path that nixos-m4pro pins by hash; a fresh machine gets it from nixos-m4pro's `tools/mac-firmware`.
 
