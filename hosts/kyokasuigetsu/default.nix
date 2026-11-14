@@ -62,9 +62,6 @@
   # Installed as 26.05 by nixos-m4pro; keep it.
   system.stateVersion = "26.05";
 
-  # Super+Return in the Hyprland session (home.nix manages hyprland.lua).
-  desktop.j614s.terminal = "ghostty";
-
   environment.shells = [ pkgs.nushell ];
 
   # Caps Lock is Escape on the text consoles and the login screen too
