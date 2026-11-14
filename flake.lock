@@ -167,11 +167,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794581857,
-        "narHash": "sha256-0ZnkK0ze1tB5StwdKuheVO0Lf6AabYCDBI1lUgE9i08=",
+        "lastModified": 1794632984,
+        "narHash": "sha256-NrVc2xpB2DoZ0A9bHMKXVvNKZNbKhOpIlyjJwqyRkIc=",
         "owner": "briheet",
         "repo": "nixos-m4pro",
-        "rev": "7e7a4316debd679b35a9826dc43cf69daf151afc",
+        "rev": "1e33dfd8b81ec84f69396b5667d3c68890a5c783",
         "type": "github"
       },
       "original": {
