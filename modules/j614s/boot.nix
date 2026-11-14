@@ -3,10 +3,10 @@
 #   iBoot -> aura Stage 1 (raw, enrolled with kmutil --raw on Macintosh HD
 #            from its recoveryOS, Kernel CTRR off; pkgs/aura-stage1.nix says
 #            why not the padded Mach-O object)
-#         -> m1n1/boot-ctxr.bin on the ESP: aura Stage 2 + this kernel's
-#            Apple device trees + U-Boot, which nixos-aurora's installed
-#            module rewrites (as a trial, then committed) on every
-#            bootloader install
+#         -> m1n1/boot-ctxr.bin on the ESP: Aurora's aura Stage 2 + this
+#            kernel's J614s device tree (with the debug UART) + Aurora's
+#            U-Boot (pkgs/bringup-stage2.nix), written by every bootloader
+#            install, the previous one kept as boot-ctxr.bin.prev
 #         -> U-Boot loads EFI/BOOT/BOOTAA64.EFI from the partition aura came
 #            from -> GRUB -> the generation's kernel
 #
@@ -20,12 +20,18 @@
 # `aura-status` shows what booted. On the ESP:
 #   aura/stage1.bin, .md5, stage1.version, enroll-stage1.sh, install-stage1.sh
 #   aura-proxy   (touch it) Stage 1 waits for a host on USB: the aura proxy
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, inputs, ... }:
 
 let
   cfg = config.hardware.j614s.boot;
   aura = pkgs.m1n1;
   stage1 = pkgs.callPackage ./pkgs/aura-stage1.nix { inherit aura; inherit (cfg) espPartuuid; };
+  stage2 = pkgs.callPackage ./pkgs/bringup-stage2.nix {
+    inherit aura;
+    uBoot = pkgs.uboot-asahi;
+    kernel = config.boot.kernelPackages.kernel;
+    kernelCommit = (lib.importJSON "${inputs.nixos-aurora}/kernel/provenance.json").kernel_commit;
+  };
 
   installStage1 = pkgs.writeText "install-stage1.sh" ''
     #!/bin/bash
@@ -92,7 +98,13 @@ in
   };
 
   config = {
-    system.build = { auraStage1 = stage1; inherit installStage1; };
+    system.build = { auraStage1 = stage1; auraStage2 = stage2; inherit installStage1; };
+
+    # nixos-aurora's Stage 2 updater commits a trial only when every device
+    # tree device has bound; on the J614s sound-jack stays deferred, so no
+    # trial ever commits and every later bootloader install is refused (and
+    # its guard reboots the trial) (2026-11-15). Stage 2 is written below.
+    aurora.stage2.enable = false;
 
     fileSystems."/" = {
       device = "/dev/disk/by-label/nixos";
@@ -108,8 +120,9 @@ in
 
     environment.systemPackages = [ status ];
 
-    # After GRUB and Aurora's Stage 2: this generation's Stage 1 and its
-    # recoveryOS enroll script.
+    # After GRUB: this generation's Stage 2 (the one it replaces kept as
+    # .prev, any Aurora trial dropped), and Stage 1 with its recoveryOS
+    # enroll script.
     boot.loader.grub.extraInstallCommands = lib.mkAfter ''
       put() {
         if ! ${pkgs.diffutils}/bin/cmp -s "$1" "$2"; then
@@ -118,6 +131,11 @@ in
           ${pkgs.coreutils}/bin/mv "$2.new" "$2"
         fi
       }
+      if [ -e ${esp}/m1n1/boot-ctxr.bin ] && ! ${pkgs.diffutils}/bin/cmp -s ${esp}/m1n1/boot-ctxr.bin ${stage2}/boot-ctxr.bin; then
+        put ${esp}/m1n1/boot-ctxr.bin ${esp}/m1n1/boot-ctxr.bin.prev
+      fi
+      put ${stage2}/boot-ctxr.bin ${esp}/m1n1/boot-ctxr.bin
+      ${pkgs.coreutils}/bin/rm -f ${esp}/aura-try ${esp}/m1n1/boot-ctxr.bin.next ${esp}/m1n1/boot-ctxr.bin.next.json
       for f in stage1.bin stage1.bin.md5 stage1.version enroll-stage1.sh; do
         put ${stage1}/$f ${esp}/aura/$f
       done
