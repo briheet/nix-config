@@ -122,7 +122,7 @@ in
         put ${stage1}/$f ${esp}/aura/$f
       done
       put ${installStage1} ${esp}/aura/install-stage1.sh
-      rm -f ${esp}/aura/stage1.macho ${esp}/aura/stage1.macho.md5
+      ${pkgs.coreutils}/bin/rm -f ${esp}/aura/stage1.macho ${esp}/aura/stage1.macho.md5
     '';
   };
 }
