@@ -6,7 +6,7 @@
 # ESP (vendorfw/firmware.cpio), which we don't have, so the trackpad, Wi-Fi
 # and Bluetooth firmware come from the store instead (pkgs/j614s-firmware.nix,
 # by hash); the kernel finds it on its normal firmware path.
-{ lib, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 
 {
   hardware.firmware = [ (pkgs.callPackage ./pkgs/j614s-firmware.nix { }) ];
@@ -16,6 +16,16 @@
   boot.kernelPatches = map (name: { inherit name; patch = ./kernel-patches + "/${name}"; })
     (lib.sort lib.lessThan (lib.filter (lib.hasSuffix ".patch")
       (builtins.attrNames (builtins.readDir ./kernel-patches))));
+  # nixos-aurora's GPU driver built on its own with ./gpu-patches (pkgs/aurora-gpu.nix),
+  # so GPU work rebuilds only the module, not the kernel.
+  boot.extraModulePackages = [
+    (config.boot.kernelPackages.callPackage ./pkgs/aurora-gpu.nix {
+      patches = map (name: ./gpu-patches + "/${name}")
+        (lib.sort lib.lessThan (lib.filter (lib.hasSuffix ".patch")
+          (builtins.attrNames (builtins.readDir ./gpu-patches))));
+    })
+  ];
+
   # The keyboard and trackpad probe in the initrd.
   boot.initrd.extraFirmwarePaths = [ "apple/tpmtfw-j614s.bin" ];
 
