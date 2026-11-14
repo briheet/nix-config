@@ -63,6 +63,9 @@
   # Installed as 26.05; keep it.
   system.stateVersion = "26.05";
 
+  # The whole screen, up to the top edge beside the notch (3024x1964).
+  hardware.j614s.boot.showNotch = true;
+
   # The ESP (NIXBOOT, 4 GB FAT32 after the 40 GB macOS container), made by
   # diskutil on 2026-11-15; aura Stage 1 loads Stage 2 from this PARTUUID.
   hardware.j614s.boot.espPartuuid = "f3b4fa28-5a11-4fc3-af48-9f64c2d5fb67";

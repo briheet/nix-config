@@ -33,6 +33,8 @@ let
     uBoot = pkgs.uboot-asahi;
     kernel = config.boot.kernelPackages.kernel;
     kernelCommit = (lib.importJSON "${inputs.nixos-aurora}/kernel/provenance.json").kernel_commit;
+    # aura keeps iBoot's whole framebuffer, notch rows included.
+    variables = lib.optionalString cfg.showNotch "chosen.asahi,show-notch=1\n";
   };
 
   installStage1 = pkgs.writeText "install-stage1.sh" ''
@@ -86,6 +88,15 @@ in
     espPartuuid = lib.mkOption {
       type = lib.types.str;
       description = "PARTUUID of the ESP; aura Stage 1 loads Stage 2 from it.";
+    };
+    showNotch = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Give the OS the whole 3024x1964 panel, the strip beside the notch
+        included, instead of the 3024x1890 below it (aura's
+        chosen.asahi,show-notch=1, from the next boot after a rebuild).
+      '';
     };
     stage1Volume = lib.mkOption {
       type = lib.types.str;

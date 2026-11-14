@@ -7,7 +7,7 @@
 -- blur, shadows and animations start off. Turn them on below if they are
 -- smooth enough.
 
----- Monitor: the 3024x1890 panel at scale 2 ----
+---- Monitor: the whole 3024x1964 panel (notch strip included) at scale 2 ----
 hl.monitor({
     output   = "",
     mode     = "preferred",

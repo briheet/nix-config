@@ -7,7 +7,12 @@
 # Only the installer boots it. An installed system's Stage 2 is nixos-aurora's
 # own (modules/installed.nix writes it on every bootloader install), built
 # from the unpatched kernel, which stays the cached one.
-{ runCommand, python3, dtc, gcc, gzip, gnutar, aura, uBoot, kernel, kernelCommit }:
+{ lib, runCommand, writeText, python3, dtc, gcc, gzip, gnutar, aura, uBoot, kernel, kernelCommit, variables ? "" }:
+
+let
+  # aura config lines (key=value), appended after the device trees.
+  variablesFile = writeText "stage2-variables" variables;
+in
 
 runCommand "j614s-bringup-stage2" { nativeBuildInputs = [ python3 dtc gcc gzip gnutar ]; } ''
   # The J614s tree with the debug UART, built as the kernel builds its dtbs.
@@ -31,6 +36,7 @@ runCommand "j614s-bringup-stage2" { nativeBuildInputs = [ python3 dtc gcc gzip g
     --kernel-commit ${kernelCommit} \
     --dtb t6040-j614s.dtb \
     --uboot $uboot \
+    ${lib.optionalString (variables != "") "--variables ${variablesFile}"} \
     --output boot-ctxr.bin
   mkdir -p $out
   cp boot-ctxr.bin* t6040-j614s.dtb $out/
