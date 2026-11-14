@@ -43,6 +43,19 @@
   # No channels: NIX_PATH becomes nixpkgs=flake:nixpkgs, the same pin.
   nix.channel.enable = false;
 
+  # Weekly: delete generations older than 14 days and what nothing uses,
+  # then rewrite the boot menu so it lists only the generations that are
+  # left. By hand: sudo systemctl start nix-gc
+  nix.gc = {
+    automatic = true;
+    dates = "weekly";
+    options = "--delete-older-than 14d";
+  };
+  systemd.services.nix-gc.serviceConfig.ExecStartPost = [
+    "/run/current-system/bin/switch-to-configuration boot"
+  ];
+  nix.optimise.automatic = true;
+
   networking.hostName = "m4pro";
   time.timeZone = "Asia/Kolkata";
 
