@@ -107,6 +107,24 @@ in
     # The kernel's squashfs has zlib and xz, not zstd.
     netboot.squashfsCompression = "xz -Xdict-size 100%";
 
+    # Aurora's initrd module set (nixos-aurora modules/aurora.nix), not
+    # NixOS's PC defaults, which this kernel doesn't build.
+    boot.initrd.includeDefaultModules = false;
+    boot.initrd.availableKernelModules = [
+      "apple-mailbox" "apple_nvmem_spmi" "nvme_apple" "pinctrl-apple-gpio"
+      "macsmc" "macsmc-power" "macsmc-input" "macsmc-hwmon" "macsmc-reboot"
+      "i2c-pasemi-platform" "tps6598x" "sn201202x" "thunderbolt_apple" "apple-dart" "dwc3"
+      "dwc3-of-simple" "xhci-pci" "pcie-apple" "gpio_macsmc" "phy-apple-atc"
+      "nvmem_apple_efuses" "spi-apple" "spi-hid-apple" "spi-hid-apple-of"
+      "rtc-macsmc" "spmi-apple-controller" "apple-dockchannel" "dockchannel-hid"
+      "apple-rtkit-helper" "usb-storage" "xhci-plat-hcd" "usbhid" "hid_generic"
+      "nvme" "uas" "sd_mod" "vfat" "ext4"
+    ];
+    # Macs have no TPM, and this kernel has no TPM drivers (as Aurora's).
+    boot.initrd.systemd.tpm2.enable = false;
+    # No sound in the installer (the Apple Silicon module's audio stack).
+    hardware.asahi.setupAsahiSound = false;
+
     # Every kernel message, on the screen and on the debug UART.
     boot.consoleLogLevel = lib.mkForce 7;
     boot.kernelParams = [ "earlycon" "console=tty0" "console=ttyDC0" ];
