@@ -2,18 +2,20 @@
 { ... }: {
   imports = [
     ../../modules/common/nushell.nix
+    ../../modules/darwin/nushell.nix
+    ../../modules/darwin/ghostty.nix
     ../../modules/common/starship.nix
     ../../modules/common/tools.nix
     ../../modules/common/lazygit.nix
     ../../modules/common/yazi.nix
     ../../modules/common/helix.nix
     ../../modules/common/tmux.nix
-    ../../modules/common/aerospace.nix
-    ../../modules/common/wallpaper.nix
-    ../../modules/common/sketchybar.nix
+    ../../modules/darwin/aerospace.nix
+    ../../modules/darwin/wallpaper.nix
+    ../../modules/darwin/sketchybar.nix
     ../../modules/common/ghostty.nix
     ../../modules/common/zellij.nix
-    ../../modules/darwin/zoxide.nix
+    ../../modules/common/zoxide.nix
     ../../modules/darwin/zen-browser.nix
   ];
 

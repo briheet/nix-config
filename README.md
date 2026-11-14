@@ -3,6 +3,13 @@
 these are my current nix configs; \
 these include m4pro, x86-64vm, nixos-anywhere config;
 
+## Layout
+
+- `modules/common/`: home manager modules that are the same on macOS and Linux (no platform checks inside)
+- `modules/darwin/`: macOS only, including the macOS halves of shared programs (nushell's PATH, the Ghostty app)
+- `modules/linux/`: Linux only (nushell's PATH, Ghostty from source, Hyprland)
+- `hosts/<name>/`: each machine imports `common/` plus its platform's directory
+
 ## Setup
 
 To use nix-darwin, use `makima`; also read this [article](https://www.briheet.com/blogs/nix-darwin-home-manager/)

@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   osConfig ? { },
   ...
 }:
@@ -16,18 +15,6 @@
       + ''
         $env.EDITOR = "hx"
         $env.VISUAL = "hx"
-        $env.PATH = (
-          $env.PATH
-          | prepend "${config.home.homeDirectory}/.local/bin"
-          | prepend "/etc/profiles/per-user/${config.home.username}/bin"
-          | prepend "/run/current-system/sw/bin"
-          | append "/usr/local/bin"
-        )
-      ''
-      # NixOS: the setuid wrappers (sudo, ...) must come before
-      # /run/current-system/sw/bin, whose sudo is not setuid.
-      + lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
-        $env.PATH = ($env.PATH | prepend "/run/wrappers/bin")
       '';
 
     extraConfig = ''

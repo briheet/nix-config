@@ -2,6 +2,7 @@
 { ... }: {
   imports = [
     ../../modules/common/nushell.nix
+    ../../modules/linux/nushell.nix
     ../../modules/common/starship.nix
     ../../modules/common/tools.nix
     ../../modules/common/lazygit.nix
@@ -9,7 +10,7 @@
     ../../modules/common/helix.nix
     ../../modules/common/tmux.nix
     ../../modules/common/zellij.nix
-    ../../modules/darwin/zoxide.nix
+    ../../modules/common/zoxide.nix
   ];
 
   home = {
