@@ -138,6 +138,23 @@
         "type": "github"
       }
     },
+    "linux": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1793885142,
+        "narHash": "sha256-q5kIQl0w/yn4dqM5rPqq2pFenxgi53XjCBa3MUlyQKI=",
+        "owner": "AsahiLinux",
+        "repo": "linux",
+        "rev": "6ba0637d1ed9a2e3639dd3fc9eca6cd0483a6434",
+        "type": "github"
+      },
+      "original": {
+        "owner": "AsahiLinux",
+        "ref": "asahi",
+        "repo": "linux",
+        "type": "github"
+      }
+    },
     "llm-agents": {
       "inputs": {
         "bun2nix": "bun2nix",
@@ -160,18 +177,37 @@
         "type": "github"
       }
     },
+    "m1n1": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794317669,
+        "narHash": "sha256-bgphbGh2xflPGsmM0EETEdIKmmHnjr/AEWH7OwML7J4=",
+        "owner": "AsahiLinux",
+        "repo": "m1n1",
+        "rev": "cf37927d6bf47c502136e7d2c9e61f946b0b8745",
+        "type": "github"
+      },
+      "original": {
+        "owner": "AsahiLinux",
+        "repo": "m1n1",
+        "type": "github"
+      }
+    },
     "nixos-m4pro": {
       "inputs": {
+        "linux": "linux",
+        "m1n1": "m1n1",
         "nixpkgs": [
           "nixpkgs"
-        ]
+        ],
+        "u-boot": "u-boot"
       },
       "locked": {
-        "lastModified": 1794632984,
-        "narHash": "sha256-NrVc2xpB2DoZ0A9bHMKXVvNKZNbKhOpIlyjJwqyRkIc=",
+        "lastModified": 1794638926,
+        "narHash": "sha256-shm4wxtxZI8TQBaTX4tAS5tvsKvPms3BU1aDAK2SI/k=",
         "owner": "briheet",
         "repo": "nixos-m4pro",
-        "rev": "1e33dfd8b81ec84f69396b5667d3c68890a5c783",
+        "rev": "040134dc72fe290b8cb1d24aab2086cb014d6755",
         "type": "github"
       },
       "original": {
@@ -258,6 +294,23 @@
       "original": {
         "owner": "numtide",
         "repo": "treefmt-nix",
+        "type": "github"
+      }
+    },
+    "u-boot": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794522090,
+        "narHash": "sha256-51zYAq02YevOPrtirBXT2d5Q7JfUKR8X2D0EX04CUzo=",
+        "owner": "aurora-silicon",
+        "repo": "u-boot",
+        "rev": "25cbb0f0d09c20bf4ebc88907430efc26c9464ae",
+        "type": "github"
+      },
+      "original": {
+        "owner": "aurora-silicon",
+        "ref": "aurora-wip",
+        "repo": "u-boot",
         "type": "github"
       }
     },
