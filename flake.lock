@@ -273,11 +273,11 @@
         "nuschtos-search": "nuschtos-search"
       },
       "locked": {
-        "lastModified": 1794637027,
-        "narHash": "sha256-lla8vpYrvs05SPiFXfhQ/xchrEsZyreICO6q+z1xC+Q=",
+        "lastModified": 1794584471,
+        "narHash": "sha256-aqkflK/+YA/VvhIUbVF72Sc12j0rBTsaS5qGmtj/ADQ=",
         "owner": "aurora-silicon",
         "repo": "nixos-aurora",
-        "rev": "a7fd69196487e70e3e63ef4a3d1b0e1ff84dd27c",
+        "rev": "25521dbed8c737691a2e21a642b328235010cdb1",
         "type": "github"
       },
       "original": {

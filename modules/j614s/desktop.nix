@@ -45,7 +45,8 @@
     environment.systemPackages = with pkgs; [
       foot
       fuzzel
-      firefox
+      # No firefox yet: nixos-aurora patches it and no cache has that build,
+      # and compiling it in the RAM installer runs out of room (2026-11-15).
       brightnessctl
       pavucontrol
     ];
