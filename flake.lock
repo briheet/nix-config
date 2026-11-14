@@ -203,16 +203,16 @@
         "u-boot": "u-boot"
       },
       "locked": {
-        "lastModified": 1794640485,
-        "narHash": "sha256-sD070Nyh8zeu3hzRMQDU4SxL+GUoWvoim5d32QyJXxI=",
+        "lastModified": 1794641758,
+        "narHash": "sha256-CmSiv1dd3g0OMas0O48U+LZLooXP5lC+ybIBcFiy7ao=",
         "owner": "briheet",
         "repo": "nixos-m4pro",
-        "rev": "dd91dca002543eb84bb0c1cfff4071c07c07a3dc",
+        "rev": "3c015174b65187ebc8be7513c11aafad700bb222",
         "type": "github"
       },
       "original": {
         "owner": "briheet",
-        "ref": "nixos-on-ssd",
+        "ref": "u-boot-keyboard",
         "repo": "nixos-m4pro",
         "type": "github"
       }
