@@ -212,7 +212,7 @@
       },
       "original": {
         "owner": "briheet",
-        "ref": "u-boot-keyboard",
+        "ref": "nixos-on-ssd",
         "repo": "nixos-m4pro",
         "type": "github"
       }

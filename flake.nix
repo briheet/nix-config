@@ -25,8 +25,7 @@
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
     # MacBook Pro M4 Pro (J614s): hardware, boot chain and desktop modules
-    # Testing the U-Boot keyboard; back to nixos-on-ssd once it is merged.
-    nixos-m4pro.url = "github:briheet/nixos-m4pro/u-boot-keyboard";
+    nixos-m4pro.url = "github:briheet/nixos-m4pro/nixos-on-ssd";
     nixos-m4pro.inputs.nixpkgs.follows = "nixpkgs";
   };
 
