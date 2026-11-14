@@ -1,0 +1,168 @@
+From: nix-config
+Subject: [PATCH] kboot_gpu: T6040 under macOS 27.2: three GPU firmware segments; name each refusal
+
+macOS 27.2's GPU firmware has a third segment, __DATA_SHARED_RO, in its own
+gfx-data-shared-ro region; dt_set_gpu_t6040() required exactly two and
+disabled the GPU. Accept the third when it matches the ADT region, reserve
+it, and publish it to the driver (apple,fw-data-shared-ro and its iova).
+Every refusal now prints the check that failed.
+---
+--- a/src/kboot_gpu.c	2026-11-15 04:52:55.442400000 +0530
++++ b/src/kboot_gpu.c	2026-11-15 04:52:55.458093545 +0530
+@@ -3606,6 +3606,7 @@
+     if (ret && ret != -FDT_ERR_NOTFOUND)
+         return -1;
+     size_t touched = 0;
++    const char *why = "ADT";
+     int sgx_path[8];
+     int sgx = adt_path_offset_trace(adt, "/arm-io/sgx", sgx_path);
+     /* ADT counts raw operating points, independently of the SGX selector maps. */
+@@ -3620,6 +3621,7 @@
+         goto disable;
+     }
+ 
++    why = "perf-states";
+     /* Operating point 0 is the off state; every other one is checked here before any use. */
+     const struct perf_state *states = adt_getprop(adt, sgx, "perf-states", &len);
+     if (!states || len != count * tables * sizeof(*states))
+@@ -3633,6 +3635,7 @@
+                 states[j * count + i].volt < 400 || states[j * count + i].volt > 1300)
+                 goto disable;
+ 
++    why = "cs/afr perf states";
+     const struct aux_perf_states *aux[2];
+     const char *aux_name[2] = {"cs-perf-states", "afr-perf-states"};
+     for (int j = 0; j < 2; j++) {
+@@ -3649,6 +3652,7 @@
+ 
+     /* Base policy defaults to the first active state, as in the T6040 power policy.
+      * Absence is valid; a malformed present value must not fall back to that policy. */
++    why = "gpu-perf-base-pstate";
+     u32 base_pstate = 1;
+     const u32 *base_prop = adt_getprop(adt, sgx, "gpu-perf-base-pstate", &len);
+     if (base_prop) {
+@@ -3661,13 +3665,20 @@
+         goto disable;
+     }
+ 
++    why = "gfx-asc segment-ranges";
+     int asc = adt_path_offset(adt, "/arm-io/gfx-asc");
+     if (asc < 0)
+         goto disable;
+     const struct adt_segment_ranges *segments = adt_getprop(adt, asc, "segment-ranges", &len);
+-    if (!segments || len != 2 * sizeof(*segments))
++    /*
++     * 26.6.2's GPU firmware has two segments (__TEXT;__DATA); 27.2's has three
++     * (__TEXT;__DATA;__DATA_SHARED_RO), the third in its own gfx-data-shared-ro region.
++     */
++    if (!segments || (len != 2 * sizeof(*segments) && len != 3 * sizeof(*segments)))
+         goto disable;
++    u32 nsegments = len / sizeof(*segments);
+ 
++    why = "reserved regions";
+     /* The reserved regions, the OPP tables and the GPU node must all take the fill. */
+     u64 region_base[ARRAY_SIZE(t6040_regions)], region_size[ARRAY_SIZE(t6040_regions)];
+     for (size_t i = 0; i < ARRAY_SIZE(t6040_regions); i++) {
+@@ -3695,12 +3706,28 @@
+     }
+     if (segments[1].phys != region_base[4] || segments[1].size != region_size[4])
+         goto disable;
++    u64 shared_ro_base = 0, shared_ro_size = 0;
++    if (nsegments == 3) {
++        why = "27.2 __DATA_SHARED_RO segment";
++        if (ADT_GETPROP(adt, sgx, "gfx-data-shared-ro-base", &shared_ro_base) != sizeof(u64) ||
++            ADT_GETPROP(adt, sgx, "gfx-data-shared-ro-size", &shared_ro_size) != sizeof(u64) ||
++            segments[2].phys != shared_ro_base || segments[2].size != shared_ro_size ||
++            !shared_ro_base || !shared_ro_size || ((shared_ro_base | shared_ro_size) & (SZ_16K - 1)) ||
++            segments[2].iova != segments[1].iova + segments[1].size)
++            goto disable;
++        for (size_t j = 0; j < ARRAY_SIZE(t6040_regions); j++)
++            if (shared_ro_base < region_base[j] + region_size[j] &&
++                region_base[j] < shared_ro_base + shared_ro_size)
++                goto disable;
++    }
++    why = "OPP tables";
+     int table =
+         t6040_opp_table(dt, gpu, "operating-points-v2", count, T6040_CLUSTERS * sizeof(u32));
+     if (table < 0 || t6040_opp_table(dt, gpu, "apple,cs-opp", aux[0]->count, sizeof(u32)) < 0 ||
+         t6040_opp_table(dt, gpu, "apple,afr-opp", aux[1]->count, sizeof(u32)) < 0)
+         goto disable;
+ 
++    why = "efuse leakage";
+     /* Leakage from the efuse page: two cluster cores, the shared SRAM, CS and AFR. */
+     u32 ef[5];
+     const u32 ef_off[5] = {0xc10, 0xc1c, 0xc20, 0xc24, 0xc28};
+@@ -3725,6 +3752,7 @@
+      * The core mask and the A/B maps are SGX registers, so the GPU must be powered to read
+      * them. Put every power state the enable changed back as it was once they are read.
+      */
++    why = "SGX power/core mask/perf maps";
+     struct pmgr_saved_modes sgx_power;
+     if (pmgr_adt_power_enable_traced_saved("/arm-io/sgx", &sgx_power) < 0)
+         goto disable;
+@@ -3738,6 +3766,7 @@
+     if (n < 0 || n_b != n)
+         goto disable;
+ 
++    why = "core mask";
+     if (masks[1] || masks[2] || (masks[0] >> (T6040_CLUSTERS * T6040_CORES)))
+         goto disable;
+     u32 active[T6040_CLUSTERS];
+@@ -3747,12 +3776,14 @@
+             goto disable;
+     }
+ 
++    why = "perf map frequencies";
+     /* Both maps must climb in frequency, so the B ladder below cannot wrap. */
+     for (int i = 2; i < n; i++)
+         if (states[index_a[i]].freq <= states[index_a[i - 1]].freq ||
+             states[index_b[i]].freq <= states[index_b[i - 1]].freq)
+             goto disable;
+ 
++    why = "power ladder";
+     /* Maximum power of each logical A state, and the relative tables. State 0 stays at 0. */
+     u32 power[T6040_MAP_STATES] = {0}, freq[T6040_MAP_STATES] = {0};
+     for (int i = 1; i < n; i++)
+@@ -3773,6 +3804,7 @@
+             goto disable;
+     }
+ 
++    why = "relative tables";
+     /* Keep the unpopulated selector slots explicit and zero in the handoff. */
+     u32 rel_a[T6040_OPPS] = {0}, rel_b[T6040_OPPS] = {0};
+     u64 span_p = power[n - 1] - power[0], span_f = freq[n - 1] - freq[base_pstate];
+@@ -3784,6 +3816,7 @@
+             i < (int)base_pstate ? 0 : (u32)(100ULL * (freq[i] - freq[base_pstate]) / span_f);
+     }
+ 
++    why = "GPU node fill";
+     /* Everything is validated. Fill the GPU node, then publish the reserved regions last. */
+     int opp;
+     u32 i = 0;
+@@ -3821,6 +3854,18 @@
+             goto disable;
+     }
+ 
++    if (nsegments == 3) {
++        /* Keep Linux off the third segment; the driver maps it from these properties. */
++        fdt64_t sro[2];
++        fdt64_st(&sro[0], shared_ro_base);
++        fdt64_st(&sro[1], shared_ro_size);
++        gpu = fdt_path_offset(dt, "gpu");
++        if (fdt_add_mem_rsv(dt, shared_ro_base, shared_ro_size) ||
++            fdt_setprop(dt, gpu, "apple,fw-data-shared-ro", sro, sizeof(sro)) ||
++            fdt_setprop_u64(dt, gpu, "apple,fw-data-shared-ro-iova", segments[2].iova))
++            goto disable;
++    }
++
+     gpu = fdt_path_offset(dt, "gpu");
+     if (fdt_setprop_u32(dt, gpu, "apple,t6040-handoff-version", 2))
+         goto disable;
+@@ -3830,6 +3875,7 @@
+     return 0;
+ 
+ disable:
++    printf("FDT: GPU: T6040: refused at %s\n", why);
+     /* A region published before a failure would stay reserved for a disabled GPU. */
+     for (size_t r = 0; r < touched; r++) {
+         int node = fdt_path_offset(dt, t6040_regions[r].path);

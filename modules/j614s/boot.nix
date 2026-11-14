@@ -26,7 +26,12 @@ let
   cfg = config.hardware.j614s.boot;
   # Aurora's aura with the NixOS snowflake as its built-in logo
   # (boot.m1n1CustomLogo, as nixos-aurora's own modules apply it).
-  aura = pkgs.m1n1.override { customLogo = config.boot.m1n1CustomLogo; };
+  # With ./aura-patches applied (name order).
+  aura = (pkgs.m1n1.override { customLogo = config.boot.m1n1CustomLogo; }).overrideAttrs (old: {
+    patches = (old.patches or [ ]) ++ map (name: ./aura-patches + "/${name}")
+      (lib.sort lib.lessThan (lib.filter (lib.hasSuffix ".patch")
+        (builtins.attrNames (builtins.readDir ./aura-patches))));
+  });
   stage1 = pkgs.callPackage ./pkgs/aura-stage1.nix { inherit aura; inherit (cfg) espPartuuid; };
   stage2 = pkgs.callPackage ./pkgs/bringup-stage2.nix {
     inherit aura;
