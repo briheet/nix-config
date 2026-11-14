@@ -203,11 +203,11 @@
         "u-boot": "u-boot"
       },
       "locked": {
-        "lastModified": 1794647645,
-        "narHash": "sha256-v3nmYYy9e4FbOxE8PZ4U1k35H5PUrAS7muQcTmEWHVE=",
+        "lastModified": 1794648172,
+        "narHash": "sha256-nMKc3uz2Yd5vaGsmGJ9H6S2XHKMuheT2mUUMl95k1G8=",
         "owner": "briheet",
         "repo": "nixos-m4pro",
-        "rev": "93fb34bad666cf1f327e9c26798ce8c0fd08b811",
+        "rev": "8ae63dc48f79fac8b5892b2b89b8978d5f6538e4",
         "type": "github"
       },
       "original": {

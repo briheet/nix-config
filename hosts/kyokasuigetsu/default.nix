@@ -62,6 +62,9 @@
   # Installed as 26.05 by nixos-m4pro; keep it.
   system.stateVersion = "26.05";
 
+  # The whole screen, up to the top edge beside the notch (3024x1964).
+  hardware.j614s.display.showNotch = true;
+
   environment.shells = [ pkgs.nushell ];
 
   # Caps Lock is Escape on the text consoles and the login screen too
