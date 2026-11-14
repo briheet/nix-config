@@ -141,16 +141,16 @@
     "linux": {
       "flake": false,
       "locked": {
-        "lastModified": 1793885142,
-        "narHash": "sha256-q5kIQl0w/yn4dqM5rPqq2pFenxgi53XjCBa3MUlyQKI=",
-        "owner": "AsahiLinux",
+        "lastModified": 1794668971,
+        "narHash": "sha256-aPrEnlTwV+CXvhEzMRq6XExGt/wV0E+9d0tIOxDKiZ8=",
+        "owner": "aurora-silicon",
         "repo": "linux",
-        "rev": "6ba0637d1ed9a2e3639dd3fc9eca6cd0483a6434",
+        "rev": "0a02a044fa872a55d8c01f0b706469b65db9293d",
         "type": "github"
       },
       "original": {
-        "owner": "AsahiLinux",
-        "ref": "asahi",
+        "owner": "aurora-silicon",
+        "ref": "integration/aurora",
         "repo": "linux",
         "type": "github"
       }
@@ -203,11 +203,11 @@
         "u-boot": "u-boot"
       },
       "locked": {
-        "lastModified": 1794649752,
-        "narHash": "sha256-D7BpuKSCQHgc40B+IMUBOXwgaOb+s2iyWqkLryydOGA=",
+        "lastModified": 1794669318,
+        "narHash": "sha256-1O5gX5Tg9o+70KVn5Fdgy3lTvCKNV4ZOAXDv9wSNbo8=",
         "owner": "briheet",
         "repo": "nixos-m4pro",
-        "rev": "712f7a8483b883021e8e29ed528f7abc40fd39f1",
+        "rev": "60b25bcffaee007d0fb392c407117e6b2d5ad514",
         "type": "github"
       },
       "original": {
