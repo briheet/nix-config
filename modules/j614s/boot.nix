@@ -24,7 +24,9 @@
 
 let
   cfg = config.hardware.j614s.boot;
-  aura = pkgs.m1n1;
+  # Aurora's aura with the NixOS snowflake as its built-in logo
+  # (boot.m1n1CustomLogo, as nixos-aurora's own modules apply it).
+  aura = pkgs.m1n1.override { customLogo = config.boot.m1n1CustomLogo; };
   stage1 = pkgs.callPackage ./pkgs/aura-stage1.nix { inherit aura; inherit (cfg) espPartuuid; };
   stage2 = pkgs.callPackage ./pkgs/bringup-stage2.nix {
     inherit aura;
@@ -105,6 +107,14 @@ in
     # trial ever commits and every later bootloader install is refused (and
     # its guard reboots the trial) (2026-11-15). Stage 2 is written below.
     aurora.stage2.enable = false;
+
+    # The NixOS logo on aura's screen instead of Aurora's: Stage 2 shows it
+    # from the next bootloader install; Stage 1 once it is enrolled again.
+    boot.m1n1CustomLogo = "${pkgs.nixos-icons}/share/icons/hicolor/256x256/apps/nix-snowflake.png";
+
+    # The GRUB menu, shown for 3 seconds (Aurora hides it, 1 second).
+    boot.loader.grub.timeoutStyle = "menu";
+    boot.loader.timeout = 3;
 
     fileSystems."/" = {
       device = "/dev/disk/by-label/nixos";
