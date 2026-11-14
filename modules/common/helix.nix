@@ -37,7 +37,7 @@ let
     exec ${lib.getExe pkgs.bash} --noprofile --norc -c "''${@: -1}"
   '';
 
-  expertElixir = pkgs.beamPackages.elixir_1_19.overrideAttrs (old: {
+  expertElixir = pkgs.beamMinimalPackages.elixir_1_19.overrideAttrs (old: {
     env = old.env // {
       ERL_COMPILER_OPTIONS = "[debug_info]";
     };
@@ -359,7 +359,7 @@ in
       timeout = 120;
       config = {
         elixirExecutablePath = lib.getExe' expertElixir "elixir";
-        erlangExecutablePath = lib.getExe' pkgs.beamPackages.erlang "erl";
+        erlangExecutablePath = lib.getExe' pkgs.beamMinimalPackages.erlang "erl";
         elixirSourcePath = "${expertElixir.src}";
       };
     };
