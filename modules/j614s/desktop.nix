@@ -17,11 +17,13 @@
     # is built without llvmpipe (on the Macs it supports the GPU renders), so
     # with no M4 GPU driver yet Hyprland fell back to softpipe and every frame
     # and key lagged (2026-11-15). Stock Mesa from the same nixpkgs (cached
-    # on cache.nixos.org) until the GPU works; Aurora's rusticl/lavapipe
-    # extras stay.
+    # on cache.nixos.org) until the GPU works. It has its own lavapipe and
+    # rusticl, which collide with Aurora's (same ICD files), so of Aurora's
+    # extras only the video-decode library stays.
     hardware.graphics.enable = true;
     hardware.graphics.package = lib.mkForce
       inputs.nixos-aurora.inputs.nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system}.mesa;
+    hardware.graphics.extraPackages = lib.mkForce [ pkgs.libvaV4l2RequestAvd ];
 
     # aquamarine (Hyprland's backend) finds no EGL device for simpledrm, which
     # has no render node, and retries on every commit. Its unmerged PR #406
