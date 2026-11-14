@@ -5,7 +5,7 @@
 # from its nixosModules.desktop. Everything here is this machine's own policy.
 #
 # On the Mac:
-#   sudo nixos-rebuild switch --flake github:briheet/nix-config/m4pro#m4pro
+#   sudo nixos-rebuild switch --flake github:briheet/nix-config#m4pro
 { pkgs, inputs, ... }:
 {
   imports = [
