@@ -8,13 +8,20 @@
 # own; without one Hyprland writes its default).
 #
 # Log in on the screen (greetd/tuigreet); it starts Hyprland.
-{ pkgs, ... }:
+{ lib, pkgs, inputs, ... }:
 
 {
   config = {
     programs.hyprland.enable = true;
-    # Mesa: llvmpipe for OpenGL ES and GBM on simpledrm.
+    # Mesa: llvmpipe for OpenGL ES and GBM on simpledrm. nixos-aurora's Mesa
+    # is built without llvmpipe (on the Macs it supports the GPU renders), so
+    # with no M4 GPU driver yet Hyprland fell back to softpipe and every frame
+    # and key lagged (2026-11-15). Stock Mesa from the same nixpkgs (cached
+    # on cache.nixos.org) until the GPU works; Aurora's rusticl/lavapipe
+    # extras stay.
     hardware.graphics.enable = true;
+    hardware.graphics.package = lib.mkForce
+      inputs.nixos-aurora.inputs.nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system}.mesa;
 
     # aquamarine (Hyprland's backend) finds no EGL device for simpledrm, which
     # has no render node, and retries on every commit. Its unmerged PR #406

@@ -74,8 +74,11 @@
   services.xserver.xkb.options = "caps:escape";
   console.useXkbConfig = true;
 
+  # sshd at boot with port 22 open (nixos-aurora keeps it off and closed).
+  aurora.openssh.startAtBoot = true;
   services.openssh = {
     enable = true;
+    openFirewall = true;
     settings = {
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
@@ -97,6 +100,11 @@
 
     openssh.authorizedKeys.keyFiles = [
       ../hetzner/secrets.txt
+    ];
+    # goryutenmetsu (github.com/briheet-invideo.keys), which drives this Mac
+    # over SSH.
+    openssh.authorizedKeys.keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOpQTq0QJQSjRg3+2dkh+UOQoVE7vQ2aJPAKicCHG8jP"
     ];
   };
 }
