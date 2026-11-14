@@ -1,9 +1,9 @@
 # MacBook Pro 14" M4 Pro (J614s) running NixOS from its SSD.
 #
-# The hardware, kernel, SSD layout and the aura/U-Boot boot chain are in
-# ../../modules/j614s (built from this flake's aura, u-boot and linux inputs),
-# the Hyprland desktop in modules/j614s/desktop.nix. Everything here is this
-# machine's own policy.
+# The hardware and boot chain are nixos-aurora's (Aurora's standard NixOS for
+# Apple silicon), set up for this Mac in ../../modules/j614s; the Hyprland
+# desktop is modules/j614s/desktop.nix. Everything here is this machine's own
+# policy.
 #
 # On the Mac:
 #   sudo nixos-rebuild switch --flake github:briheet/nix-config#kyokasuigetsu
@@ -62,9 +62,6 @@
 
   # Installed as 26.05; keep it.
   system.stateVersion = "26.05";
-
-  # The whole screen, up to the top edge beside the notch (3024x1964).
-  hardware.j614s.display.showNotch = true;
 
   # The ESP (NIXBOOT, 4 GB FAT32 after the 40 GB macOS container), made by
   # diskutil on 2026-11-15; aura Stage 1 loads Stage 2 from this PARTUUID.

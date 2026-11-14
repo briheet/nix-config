@@ -24,21 +24,11 @@
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
-    # MacBook Pro M4 Pro (J614s) boot chain and kernel, all aurora-silicon's,
-    # built by modules/j614s. `nix flake update aura` (or u-boot, linux)
-    # follows upstream; our patches in modules/j614s apply on top.
-    aura = {
-      url = "github:aurora-silicon/aura";
-      flake = false;
-    };
-    u-boot = {
-      url = "github:aurora-silicon/u-boot/aurora-wip";
-      flake = false;
-    };
-    linux = {
-      url = "github:aurora-silicon/linux/integration/aurora";
-      flake = false;
-    };
+    # MacBook Pro M4 Pro (J614s): nixos-aurora, Aurora's standard NixOS for
+    # Apple silicon (kernel, U-Boot, aura, Stage 2 updates, its own nixpkgs
+    # pin). Locked to a commit whose kernel, U-Boot and aura are in Aurora's
+    # binary cache; kyokasuigetsu is built with its nixpkgs so they match.
+    nixos-aurora.url = "github:aurora-silicon/nixos-aurora";
   };
 
   outputs =
@@ -86,8 +76,9 @@
           ];
         };
 
-        # MacBook Pro M4 Pro (J614s), NixOS on its SSD
-        kyokasuigetsu = nixpkgs.lib.nixosSystem {
+        # MacBook Pro M4 Pro (J614s), NixOS on its SSD, on nixos-aurora (its
+        # nixpkgs, so Aurora's cached kernel, U-Boot and aura match)
+        kyokasuigetsu = inputs.nixos-aurora.inputs.nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs; };
           modules = [
             home-manager.nixosModules.home-manager
@@ -96,8 +87,8 @@
         };
 
         # NixOS from RAM that installs kyokasuigetsu onto the J614s's SSD
-        # from git (modules/j614s/installer.nix); booted from the ESP by U-Boot.
-        kyokasuigetsu-installer = nixpkgs.lib.nixosSystem {
+        # from git (modules/j614s/installer.nix); booted from the ESP.
+        kyokasuigetsu-installer = inputs.nixos-aurora.inputs.nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs; };
           modules = [
             ./modules/j614s/installer.nix
@@ -132,32 +123,49 @@
         };
       };
 
-      # A new ESP for the J614s, to copy onto the FAT partition macOS made:
-      # aura Stage 2 and Stage 1 (with its recoveryOS enroll script), and an
-      # extlinux menu whose only entry is the installer.
+      # What goes on the J614s's ESP for the first install, copied onto the
+      # FAT partition macOS made:
+      #   EFI/BOOT/BOOTAA64.EFI  a standalone GRUB whose only entry is the
+      #                          installer (U-Boot loads it from the ESP)
+      #   installer/             its kernel (Aurora's) and initrd
+      #   m1n1/boot-ctxr.bin     the bring-up Stage 2 (debug UART)
+      #   aura/                  Stage 1 and its recoveryOS enroll script
+      # nixos-install replaces GRUB and Stage 2 with the installed system's.
       packages.aarch64-linux.j614s-esp =
         let
-          pkgs = nixpkgs.legacyPackages.aarch64-linux;
-          host = self.nixosConfigurations.kyokasuigetsu.config.system.build;
-          inst = self.nixosConfigurations.kyokasuigetsu-installer.config.system.build;
+          host = self.nixosConfigurations.kyokasuigetsu;
+          inst = self.nixosConfigurations.kyokasuigetsu-installer;
+          pkgs = inst.pkgs;
+          kernel = inst.config.boot.kernelPackages.kernel;
+          stage2 = pkgs.callPackage ./modules/j614s/pkgs/bringup-stage2.nix {
+            aura = pkgs.m1n1;
+            uBoot = pkgs.uboot-asahi;
+            inherit kernel;
+            kernelCommit = (builtins.fromJSON (builtins.readFile "${inputs.nixos-aurora}/kernel/provenance.json")).kernel_commit;
+          };
+          stage1 = host.config.system.build.auraStage1;
+          grubCfg = pkgs.writeText "grub.cfg" ''
+            set timeout=3
+            search --no-floppy --file --set=root /installer/Image
+            menuentry "NixOS installer (kyokasuigetsu)" {
+              linux /installer/Image init=${inst.config.system.build.toplevel}/init ${toString inst.config.boot.kernelParams}
+              initrd /installer/initrd
+            }
+          '';
         in
-        pkgs.runCommand "j614s-esp" { } ''
-          mkdir -p $out/extlinux $out/installer
-          cp -r ${host.auraEsp}/. $out/
-          chmod -R u+w $out
-          cp ${inst.kernel}/Image $out/installer/Image
-          cp ${inst.netbootRamdisk}/initrd $out/installer/initrd
-          cat > $out/extlinux/extlinux.conf <<EOF
-          DEFAULT installer
-          TIMEOUT 30
-          MENU TITLE j614s installer
-          LABEL installer
-            MENU LABEL NixOS installer (kyokasuigetsu)
-            LINUX ../installer/Image
-            INITRD ../installer/initrd
-            APPEND init=${inst.toplevel}/init $(cat ${inst.toplevel}/kernel-params)
-          EOF
-          du -sh $out/installer/*
+        pkgs.runCommand "j614s-esp" { nativeBuildInputs = [ pkgs.grub2_efi ]; } ''
+          mkdir -p $out/EFI/BOOT $out/installer $out/m1n1 $out/aura
+          grub-mkstandalone -O arm64-efi -o $out/EFI/BOOT/BOOTAA64.EFI \
+            --modules="part_gpt fat search search_fs_file linux normal configfile echo" \
+            "boot/grub/grub.cfg=${grubCfg}"
+          cp ${kernel}/Image $out/installer/Image
+          cp ${inst.config.system.build.netbootRamdisk}/initrd $out/installer/initrd
+          cp ${stage2}/boot-ctxr.bin $out/m1n1/boot-ctxr.bin
+          for f in stage1.macho stage1.macho.md5 stage1.version enroll-stage1.sh; do
+            cp ${stage1}/$f $out/aura/$f
+          done
+          cp ${host.config.system.build.installStage1} $out/aura/install-stage1.sh
+          du -sh $out/*/*
         '';
 
       # Put other configs here for other systems

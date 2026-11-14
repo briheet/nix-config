@@ -1,91 +1,65 @@
-# The J614s boot chain, all aurora-silicon's (aura, aurora U-Boot, aurora
-# kernel), built from nix-config's own flake inputs:
+# The J614s boot chain, nixos-aurora's:
 #
 #   iBoot -> aura Stage 1 (padded Mach-O boot object, enrolled with kmutil
 #            on Macintosh HD from its recoveryOS)
-#         -> m1n1/boot-ctxr.bin on the ESP: aura Stage 2 + t6040-j614s.dtb
-#            + U-Boot (rewritten with every generation, since the DTB is the
-#            generation's kernel's)
-#         -> U-Boot's extlinux menu -> the generation's kernel, which runs
-#            in aura's CTXR execute window
+#         -> m1n1/boot-ctxr.bin on the ESP: aura Stage 2 + this kernel's
+#            Apple device trees + U-Boot, which nixos-aurora's installed
+#            module rewrites (as a trial, then committed) on every
+#            bootloader install
+#         -> U-Boot loads EFI/BOOT/BOOTAA64.EFI from the partition aura came
+#            from -> GRUB -> the generation's kernel, in aura's CTXR window
 #
-# Stage 1 changes only from recoveryOS (kmutil, with the owner's password).
-# Each switch also writes the Stage 1 this generation would use to the ESP,
-# with a script that enrolls it, and `aura-status` says when the Stage 1 that
-# booted is not that one.
+# Stage 1 is the one part nixos-aurora never writes (its installer enrolls
+# it). Here it is built from Aurora's aura package (pkgs/aura-stage1.nix) and
+# every bootloader install puts it on the ESP with its enroll script; enroll
+# it from recoveryOS:
 #
-# On the ESP:
-#   m1n1/boot-ctxr.bin        Stage 2, what Stage 1 loads
-#   m1n1/boot-ctxr.bin.prev   the Stage 2 it replaced (copy back from recoveryOS)
-#   aura/stage1.macho         Stage 1 for this generation (padded, 153 MB),
-#                             its .md5, stage1.version its tag
-#   aura/enroll-stage1.sh     aura's enroll script
-#   aura/install-stage1.sh    enrolls stage1.macho (recoveryOS)
-#   aura-proxy                (touch it) Stage 1 waits for a host on USB: the
-#                             aura proxy, for tethered work
-{ config, lib, pkgs, inputs, ... }:
+#   bash /Volumes/NIXBOOT/aura/install-stage1.sh
+#
+# `aura-status` shows what booted. On the ESP:
+#   aura/stage1.macho, .md5, stage1.version, enroll-stage1.sh, install-stage1.sh
+#   aura-proxy   (touch it) Stage 1 waits for a host on USB: the aura proxy
+{ config, lib, pkgs, ... }:
 
 let
   cfg = config.hardware.j614s.boot;
-  extlinux = config.boot.loader.generic-extlinux-compatible;
-  kernel = config.boot.kernelPackages.kernel;
-
-  aura = pkgs.callPackage ./pkgs/aura.nix { src = inputs.aura; };
-  uBoot = pkgs.callPackage ./pkgs/u-boot.nix { src = inputs.u-boot; };
+  aura = pkgs.m1n1;
   stage1 = pkgs.callPackage ./pkgs/aura-stage1.nix { inherit aura; inherit (cfg) espPartuuid; };
-  stage2 = pkgs.callPackage ./pkgs/aura-stage2.nix {
-    inherit aura kernel uBoot;
-    kernelRev = inputs.linux.rev;
-  };
-  stage1Version = aura.versionTag;
 
   installStage1 = pkgs.writeText "install-stage1.sh" ''
     #!/bin/bash
     # Enrolls aura Stage 1 from this ESP as the boot object of a macOS volume
-    # (Macintosh HD by default). In recoveryOS (shut down, hold the power
-    # button until "Loading startup options", Options), Terminal:
+    # (${cfg.stage1Volume} by default). In recoveryOS (shut down, hold the
+    # power button until "Loading startup options", Options), Terminal:
     #
-    #   diskutil mount disk0s4                         (the ESP)
     #   bash /Volumes/NIXBOOT/aura/install-stage1.sh   [VOLUME [enroll options]]
     #
-    # VOLUME defaults to ${cfg.stage1Volume}. Further options go to aura's
-    # enroll-stage1.sh (--check runs every check and stops; --keep FILE MD5
-    # names a rollback image; the default is --no-rollback).
+    # Startup Security Utility must allow Reduced Security for the volume
+    # first. Further options go to aura's enroll-stage1.sh (--check runs every
+    # check and stops; --keep FILE MD5 names a rollback image; the default is
+    # --no-rollback).
     set -e
     dir=$(cd "$(dirname "$0")" && pwd)
     volume="''${1:-${cfg.stage1Volume}}"
     [ $# -gt 0 ] && shift
     [ $# -gt 0 ] || set -- --no-rollback
-
     echo "aura Stage 1 $(cat "$dir/stage1.version") for $volume"
     bash "$dir/enroll-stage1.sh" --compress "$@" "$volume" "$dir/stage1.macho" "$(cat "$dir/stage1.macho.md5")"
   '';
 
+  esp = config.boot.loader.efi.efiSysMountPoint;
   status = pkgs.writeShellApplication {
     name = "aura-status";
     runtimeInputs = [ pkgs.coreutils ];
     text = ''
       chosen=/proc/device-tree/chosen
       prop() { if [ -r "$chosen/$1" ]; then tr -d '\0' < "$chosen/$1"; else echo "unknown"; fi; }
-      esp() { if [ -r "/boot/aura/$1" ]; then cat "/boot/aura/$1"; else echo "none"; fi; }
-      running=$(prop asahi,m1n1-stage1-version)
-      onesp=$(esp stage1.version)
-
-      if [ "''${1:-}" = "--record" ]; then
-        if [ "$running" != "$onesp" ] && [ "$onesp" != "none" ]; then
-          echo "aura Stage 1: booted $running, this generation's is $onesp."
-          echo "  To update it, in recoveryOS Terminal: bash /Volumes/NIXBOOT/aura/install-stage1.sh"
-        fi
-        exit 0
-      fi
-
       echo "iBoot               $(prop asahi,iboot1-version) / $(prop asahi,iboot2-version)"
-      echo "aura Stage 1        booted $running, on the ESP $onesp"
+      echo "aura Stage 1        booted $(prop asahi,m1n1-stage1-version), on the ESP $(cat ${esp}/aura/stage1.version 2>/dev/null || echo none)"
       echo "aura Stage 2        booted $(prop asahi,m1n1-stage2-version)"
       echo "CTXR window         $(if [ -e "$chosen/aurora,ctxr-exec-window" ]; then echo present; else echo absent; fi)"
-      echo "U-Boot              booted $(prop u-boot,version)"
       echo "kernel              booted $(uname -r)"
-      echo "proxy on next boot  $(if [ -e /boot/aura-proxy ]; then echo yes; else echo no; fi)"
+      echo "proxy on next boot  $(if [ -e ${esp}/aura-proxy ]; then echo yes; else echo no; fi)"
     '';
   };
 in
@@ -93,8 +67,7 @@ in
   options.hardware.j614s.boot = {
     espPartuuid = lib.mkOption {
       type = lib.types.str;
-      default = "c1689edb-3947-4ed4-ba55-696ead4f2833";
-      description = "PARTUUID of the ESP (nixos-boot); Stage 1 loads Stage 2 from it.";
+      description = "PARTUUID of the ESP; aura Stage 1 loads Stage 2 from it.";
     };
     stage1Volume = lib.mkOption {
       type = lib.types.str;
@@ -109,84 +82,36 @@ in
   };
 
   config = {
-    system.build = {
-      auraStage1 = stage1;
-      auraStage2 = stage2;
-      inherit aura uBoot;
-      # What the boot loader install puts on the ESP besides extlinux, as a
-      # tree: for seeding a new ESP from macOS (flake package j614s-esp).
-      auraEsp = pkgs.runCommand "j614s-aura-esp" { } ''
-        install -Dm644 ${stage2}/boot-ctxr.bin $out/m1n1/boot-ctxr.bin
-        install -Dm644 ${stage1}/stage1.macho $out/aura/stage1.macho
-        install -Dm644 ${stage1}/stage1.macho.md5 $out/aura/stage1.macho.md5
-        install -Dm644 ${stage1}/enroll-stage1.sh $out/aura/enroll-stage1.sh
-        install -Dm644 ${installStage1} $out/aura/install-stage1.sh
-        echo ${stage1Version} > $out/aura/stage1.version
-      '';
-    };
+    system.build = { auraStage1 = stage1; inherit installStage1; };
 
     fileSystems."/" = {
-      device = "/dev/disk/by-partlabel/nixos";
+      device = "/dev/disk/by-label/nixos";
       fsType = "ext4";
     };
-    fileSystems."/boot" = {
-      device = "/dev/disk/by-partlabel/nixos-boot";
+    fileSystems.${esp} = {
+      device = "/dev/disk/by-partuuid/${cfg.espPartuuid}";
       fsType = "vfat";
       options = [ "fmask=0077" "dmask=0077" ];
     };
-
-    boot.loader.grub.enable = false;
-    boot.loader.generic-extlinux-compatible.enable = true;
-    # Each generation's kernel and initrd (about 40 MB) go on the 512 MiB ESP,
-    # beside Stage 1 (a few MB gzipped).
-    boot.loader.generic-extlinux-compatible.configurationLimit = lib.mkDefault 6;
-    # Linux gets the device tree aura filled in (memory, CPUs, framebuffer,
-    # carveouts, the CTXR window), which U-Boot passes on.
-    boot.loader.generic-extlinux-compatible.useGenerationDeviceTree = false;
-    hardware.deviceTree.name = "apple/t6040-j614s.dtb";
+    # Kernels and initrds of every generation GRUB lists go on the 4 GB ESP.
+    boot.loader.grub.configurationLimit = lib.mkDefault 8;
 
     environment.systemPackages = [ status ];
 
-    systemd.services.aura-status = {
-      description = "Say when the aura Stage 1 that booted is not this generation's";
-      wantedBy = [ "multi-user.target" ];
-      unitConfig.RequiresMountsFor = "/boot";
-      serviceConfig = {
-        Type = "oneshot";
-        ExecStart = "${status}/bin/aura-status --record";
-      };
-    };
-
-    # The extlinux installer, then Stage 2 and Stage 1: each file written
-    # beside the old one and renamed over it, so a failed copy leaves the
-    # previous file whole.
-    system.build.installBootLoader = lib.mkForce (
-      pkgs.writeShellScript "install-extlinux-aura" ''
-        set -eu
-        export PATH=${lib.makeBinPath [ pkgs.coreutils pkgs.diffutils ]}:$PATH
-        ${extlinux.populateCmd} -d /boot -c "$@"
-
-        put() { # put SRC DEST: replace DEST only if it differs
-          if ! cmp -s "$1" "$2"; then
-            install -D -m 644 "$1" "$2.new"
-            sync -f "$2.new"
-            mv "$2.new" "$2"
-          fi
-        }
-
-        if [ -e /boot/m1n1/boot-ctxr.bin ] && ! cmp -s /boot/m1n1/boot-ctxr.bin ${stage2}/boot-ctxr.bin; then
-          put /boot/m1n1/boot-ctxr.bin /boot/m1n1/boot-ctxr.bin.prev
+    # After GRUB and Aurora's Stage 2: this generation's Stage 1 and its
+    # recoveryOS enroll script.
+    boot.loader.grub.extraInstallCommands = lib.mkAfter ''
+      put() {
+        if ! ${pkgs.diffutils}/bin/cmp -s "$1" "$2"; then
+          ${pkgs.coreutils}/bin/install -D -m 644 "$1" "$2.new"
+          ${pkgs.coreutils}/bin/sync -f "$2.new"
+          ${pkgs.coreutils}/bin/mv "$2.new" "$2"
         fi
-        put ${stage2}/boot-ctxr.bin /boot/m1n1/boot-ctxr.bin
-
-        put ${stage1}/stage1.macho /boot/aura/stage1.macho
-        rm -f /boot/aura/stage1.macho.gz
-        put ${stage1}/stage1.macho.md5 /boot/aura/stage1.macho.md5
-        put ${stage1}/enroll-stage1.sh /boot/aura/enroll-stage1.sh
-        put ${installStage1} /boot/aura/install-stage1.sh
-        echo ${stage1Version} > /boot/aura/stage1.version
-        ${status}/bin/aura-status --record
-      ''
-    );
+      }
+      for f in stage1.macho stage1.macho.md5 stage1.version enroll-stage1.sh; do
+        put ${stage1}/$f ${esp}/aura/$f
+      done
+      put ${installStage1} ${esp}/aura/install-stage1.sh
+    '';
   };
 }
