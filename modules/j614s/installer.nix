@@ -127,7 +127,9 @@ in
 
     # Every kernel message, on the screen and on the debug UART.
     boot.consoleLogLevel = lib.mkForce 7;
-    boot.kernelParams = [ "earlycon" "console=tty0" "console=ttyDC0" ];
+    # aura drops stdout-path on a non-debug boot, so earlycon names the
+    # UART (DockChannel channel 1's data window, ../dts/j614s-debug-uart.dtsi).
+    boot.kernelParams = [ "earlycon=dockchannel,0x50883c000" "console=tty0" "console=ttyDC0" ];
 
     users.users.root.hashedPassword = lib.mkForce "";
     services.getty.autologinUser = "root";

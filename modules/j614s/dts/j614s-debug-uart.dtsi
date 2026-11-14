@@ -2,9 +2,11 @@
  * The debug UART: DockChannel channel 1, which a host reads over debug USB
  * (macvdmtool debugusb, kis channel 1) and where aura logs. From the ADT
  * (/arm-io/dockchannel-uart: block 0x508828000, IRQ registers 0x50880c000,
- * interrupt 360); channel n has its config window at 0xc000 * n and data
- * 0x4000 above it. As serial0 and stdout-path it is U-Boot's console and
- * Linux's earlycon and ttyDC0.
+ * interrupt 360). Channel n's config window is at the block + 0x10000 * n
+ * and its data window 0x4000 above that (aura's dockchannel_uart.c: TX8 at
+ * base + 0x4004), so channel 1 is config 0x508838000, data 0x50883c000.
+ * aura drops stdout-path unless the boot is a debug boot, so the installer
+ * also names the console explicitly (earlycon=dockchannel,0x50883c000).
  */
 / {
 	aliases {
@@ -15,10 +17,10 @@
 		stdout-path = "serial0";
 	};
 
-	dockchannel_uart: serial@508838000 {
+	dockchannel_uart: serial@50883c000 {
 		compatible = "apple,dockchannel-uart";
-		reg = <0x5 0x08838000 0x0 0x4000>,
-		      <0x5 0x08834000 0x0 0x4000>,
+		reg = <0x5 0x0883c000 0x0 0x4000>,
+		      <0x5 0x08838000 0x0 0x4000>,
 		      <0x5 0x0880c000 0x0 0x18>;
 		reg-names = "data", "config", "irq";
 		apple,channel = <1>;

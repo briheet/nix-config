@@ -161,7 +161,7 @@
           cp ${kernel}/Image $out/installer/Image
           cp ${inst.config.system.build.netbootRamdisk}/initrd $out/installer/initrd
           cp ${stage2}/boot-ctxr.bin $out/m1n1/boot-ctxr.bin
-          for f in stage1.macho stage1.macho.md5 stage1.version enroll-stage1.sh; do
+          for f in stage1.bin stage1.bin.md5 stage1.version enroll-stage1.sh; do
             cp ${stage1}/$f $out/aura/$f
           done
           cp ${host.config.system.build.installStage1} $out/aura/install-stage1.sh

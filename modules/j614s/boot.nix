@@ -1,13 +1,14 @@
 # The J614s boot chain, nixos-aurora's:
 #
-#   iBoot -> aura Stage 1 (padded Mach-O boot object, enrolled with kmutil
-#            on Macintosh HD from its recoveryOS)
+#   iBoot -> aura Stage 1 (raw, enrolled with kmutil --raw on Macintosh HD
+#            from its recoveryOS, Kernel CTRR off; pkgs/aura-stage1.nix says
+#            why not the padded Mach-O object)
 #         -> m1n1/boot-ctxr.bin on the ESP: aura Stage 2 + this kernel's
 #            Apple device trees + U-Boot, which nixos-aurora's installed
 #            module rewrites (as a trial, then committed) on every
 #            bootloader install
 #         -> U-Boot loads EFI/BOOT/BOOTAA64.EFI from the partition aura came
-#            from -> GRUB -> the generation's kernel, in aura's CTXR window
+#            from -> GRUB -> the generation's kernel
 #
 # Stage 1 is the one part nixos-aurora never writes (its installer enrolls
 # it). Here it is built from Aurora's aura package (pkgs/aura-stage1.nix) and
@@ -17,7 +18,7 @@
 #   bash /Volumes/NIXBOOT/aura/install-stage1.sh
 #
 # `aura-status` shows what booted. On the ESP:
-#   aura/stage1.macho, .md5, stage1.version, enroll-stage1.sh, install-stage1.sh
+#   aura/stage1.bin, .md5, stage1.version, enroll-stage1.sh, install-stage1.sh
 #   aura-proxy   (touch it) Stage 1 waits for a host on USB: the aura proxy
 { config, lib, pkgs, ... }:
 
@@ -35,16 +36,25 @@ let
     #   bash /Volumes/NIXBOOT/aura/install-stage1.sh   [VOLUME [enroll options]]
     #
     # Startup Security Utility must allow Reduced Security for the volume
-    # first. Further options go to aura's enroll-stage1.sh (--check runs every
-    # check and stops; --keep FILE MD5 names a rollback image; the default is
-    # --no-rollback).
+    # first. A raw Stage 1 needs Kernel CTRR off: if bputil reports it on,
+    # this runs `bputil -nc` (it asks for the owner's password). Further
+    # options go to aura's enroll-stage1.sh (--check runs every check and
+    # stops; --keep FILE MD5 names a rollback image; the default is
+    # --no-rollback). recoveryOS has no grep or cat: bash builtins and sed.
     set -e
     dir=$(cd "$(dirname "$0")" && pwd)
     volume="''${1:-${cfg.stage1Volume}}"
     [ $# -gt 0 ] && shift
     [ $# -gt 0 ] || set -- --no-rollback
-    echo "aura Stage 1 $(cat "$dir/stage1.version") for $volume"
-    bash "$dir/enroll-stage1.sh" --compress "$@" "$volume" "$dir/stage1.macho" "$(cat "$dir/stage1.macho.md5")"
+    read -r version < "$dir/stage1.version"
+    read -r md5 < "$dir/stage1.bin.md5"
+    echo "aura Stage 1 $version (raw) for $volume"
+    group=$(diskutil info "/Volumes/$volume" | sed -n 's/^ *APFS Volume Group: *//p')
+    if [ -n "$group" ] && [ -n "$(bputil -d -v "$group" 2>&1 | sed -n '/Kernel CTRR Status: *Enabled/p')" ]; then
+      echo "Kernel CTRR is on for $volume; turning it off (bputil -nc), which asks for your password."
+      bputil -nc -v "$group"
+    fi
+    bash "$dir/enroll-stage1.sh" --raw "$@" "$volume" "$dir/stage1.bin" "$md5"
   '';
 
   esp = config.boot.loader.efi.efiSysMountPoint;
@@ -108,10 +118,11 @@ in
           ${pkgs.coreutils}/bin/mv "$2.new" "$2"
         fi
       }
-      for f in stage1.macho stage1.macho.md5 stage1.version enroll-stage1.sh; do
+      for f in stage1.bin stage1.bin.md5 stage1.version enroll-stage1.sh; do
         put ${stage1}/$f ${esp}/aura/$f
       done
       put ${installStage1} ${esp}/aura/install-stage1.sh
+      rm -f ${esp}/aura/stage1.macho ${esp}/aura/stage1.macho.md5
     '';
   };
 }
