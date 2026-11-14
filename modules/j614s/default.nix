@@ -31,4 +31,7 @@ in
 
   # No Aurora desktop or greeter: ./desktop.nix brings Hyprland.
   aurora.desktop = "minimal";
+  # No Flatpak: software comes from Nix, and Aurora's Flatpak GL provider
+  # (its GPU Mesa, inert here) held the greeter back 1.4 s at boot.
+  aurora.flatpak.enable = false;
 }
