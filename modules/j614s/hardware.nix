@@ -13,6 +13,25 @@
   # The keyboard and trackpad probe in the initrd.
   boot.initrd.extraFirmwarePaths = [ "apple/tpmtfw-j614s.bin" ];
 
+  # nixos-aurora blacklists the Wi-Fi and Bluetooth drivers and loads them
+  # from its firmware admission once the ESP's vendor firmware is in place;
+  # with no vendorfw on this ESP they never loaded (2026-11-15). Load them
+  # after Aurora's firmware step; the firmware is the store copy above.
+  systemd.services.j614s-radios = {
+    description = "Load the J614s Wi-Fi and Bluetooth drivers";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "aurora-vendor-firmware.service" ];
+    before = [ "NetworkManager.service" "bluetooth.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = [
+        "${pkgs.kmod}/bin/modprobe brcmfmac"
+        "-${pkgs.kmod}/bin/modprobe hci_bcm4377"
+      ];
+    };
+  };
+
   # A large console font for the 3024x1890 panel (Terminus 32 px).
   console = {
     earlySetup = lib.mkDefault true;
