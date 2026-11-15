@@ -16,7 +16,8 @@ are renumbered at push time; the 27.0 table stays as it is for the T6050.
 Without apple,max-brightness the panel gets the desktop 600-nit SDR ceiling,
 as on 26.x: with none, no swap was submitted (logged as "swap failed!
 status -1", now named as such).
-It is off until appledrm.t6041_fw27=1 (nix-config specialisation display-27).
+appledrm.t6041_fw27=0 leaves the panel on the boot framebuffer (nix-config
+specialisation simpledrm).
 (github:briheet/nixos-m4pro docs/display/dcp-27.2-kernel.md, dcp-27.2-rpc.md)
 --- a/drivers/gpu/drm/apple/dcp-internal.h
 +++ b/drivers/gpu/drm/apple/dcp-internal.h
@@ -71,14 +72,14 @@ It is off until appledrm.t6041_fw27=1 (nix-config specialisation display-27).
  /*
 + * T6041 internal panel on the macOS 27.2 DCP firmware (j614s): the boot loader
 + * (aura with nix-config's aura-patches) publishes firmware-version 27.2.x with
-+ * firmware-compat 27.0.0, and with t6041_fw27=1 it is driven through the
-+ * T6050's firmware-27 interface, as T8142 is on 27.0. Off by default while it
-+ * is brought up (swaps still fail): the panel stays on the boot framebuffer.
++ * firmware-compat 27.0.0, and it is driven through the T6050's firmware-27
++ * interface, as T8142 is on 27.0. t6041_fw27=0 leaves the panel on the boot
++ * framebuffer instead.
 + */
-+static bool t6041_fw27;
++static bool t6041_fw27 = true;
 +module_param(t6041_fw27, bool, 0444);
 +MODULE_PARM_DESC(t6041_fw27,
-+		 "T6041 internal panel: drive the 27.2 DCP firmware through the firmware-27 interface (default 0)");
++		 "T6041 internal panel: drive the 27.2 DCP firmware through the firmware-27 interface (default 1)");
 +
 +static bool dcp_t6041_fw27(struct device *dev)
 +{

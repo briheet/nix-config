@@ -3,9 +3,9 @@
 -- nixos/hyprland.lua. Hyprland 0.57 reads Lua; the wiki is at
 -- https://wiki.hypr.land/configuring/
 --
--- Rendering is on the GPU (since 2026-11-15; before, Mesa llvmpipe on the
--- CPU), but blur, shadows and animations still start off. Turn them on below
--- once the GPU desktop has proven itself.
+-- Rendering is on the GPU and the panel runs at 120 Hz through the display
+-- coprocessor (since 2026-11-15; before, llvmpipe on the CPU into the boot
+-- framebuffer), so animations are on. Blur and shadows still start off.
 
 ---- Monitor: the whole 3024x1964 panel (notch strip included) at scale 2 ----
 hl.monitor({
@@ -45,7 +45,7 @@ hl.config({
         blur   = { enabled = false },
     },
 
-    animations = { enabled = false },
+    animations = { enabled = true },
 
     dwindle = { preserve_split = true },
 
@@ -105,6 +105,10 @@ hl.bind(mod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
 hl.bind(mod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
 hl.bind(mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
+-- Screen brightness (the panel's backlight, through logind).
+hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%+"), { locked = true, repeating = true })
+hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%-"), { locked = true, repeating = true })
+
 ---- Windows ----
 hl.window_rule({
     name  = "suppress-maximize-events",
@@ -124,3 +128,21 @@ hl.window_rule({
     },
     no_focus = true,
 })
+
+---- Animations: Hyprland's default curves, a little quicker ----
+hl.curve("easeOutQuint", { type = "bezier", points = { {0.23, 1},  {0.32, 1} } })
+hl.curve("linear",       { type = "bezier", points = { {0, 0},     {1, 1}    } })
+hl.curve("almostLinear", { type = "bezier", points = { {0.5, 0.5}, {0.75, 1} } })
+hl.curve("quick",        { type = "bezier", points = { {0.15, 0},  {0.1, 1}  } })
+hl.curve("easy",         { type = "spring", mass = 1, stiffness = 238.1191, damping = 24.21279333 })
+
+hl.animation({ leaf = "global",       enabled = true, speed = 10,  bezier = "default" })
+hl.animation({ leaf = "border",       enabled = true, speed = 5,   bezier = "easeOutQuint" })
+hl.animation({ leaf = "windows",      enabled = true, speed = 4,   spring = "easy" })
+hl.animation({ leaf = "windowsIn",    enabled = true, speed = 3.5, spring = "easy",         style = "popin 87%" })
+hl.animation({ leaf = "windowsOut",   enabled = true, speed = 1.3, bezier = "linear",       style = "popin 87%" })
+hl.animation({ leaf = "fadeIn",       enabled = true, speed = 1.5, bezier = "almostLinear" })
+hl.animation({ leaf = "fadeOut",      enabled = true, speed = 1.3, bezier = "almostLinear" })
+hl.animation({ leaf = "fade",         enabled = true, speed = 2.5, bezier = "quick" })
+hl.animation({ leaf = "layers",       enabled = true, speed = 3.5, bezier = "easeOutQuint" })
+hl.animation({ leaf = "workspaces",   enabled = true, speed = 1.7, bezier = "almostLinear", style = "fade" })

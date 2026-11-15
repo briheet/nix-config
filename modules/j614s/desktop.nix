@@ -1,11 +1,11 @@
 # The desktop on the installed system: Hyprland, rendered by the GPU, shown
-# on the boot framebuffer.
+# by the display coprocessor (DCP) at 3024x1964, 120 Hz, scale 2.
 #
-# The GPU (aurora.ko with ./gpu-patches, macOS 27.2 firmware) renders; the
-# display is still simpledrm (the framebuffer iBoot set up, which m1n1
-# describes), at 3024x1964 and scale 2, since the display coprocessor (DCP)
-# does not run on 27.2 yet. Mesa pairs the two as it pairs Apple's display
-# driver with the GPU (kmsro, "apple"): /etc/drirc below maps simpledrm to it.
+# The GPU (aurora.ko with ./gpu-patches) and the DCP (appledrm.ko with
+# ./display-patches) both run on the macOS 27.2 firmware. The GRUB entry
+# "simpledrm" (./hardware.nix) leaves the panel on the boot framebuffer
+# instead; for that path, /etc/drirc below pairs simpledrm with the GPU as
+# Mesa pairs Apple's display driver with it (kmsro, "apple").
 # Hyprland config: ~/.config/hypr/hyprland.lua (home-manager or your own).
 #
 # Log in on the screen (greetd/tuigreet); it starts Hyprland.
