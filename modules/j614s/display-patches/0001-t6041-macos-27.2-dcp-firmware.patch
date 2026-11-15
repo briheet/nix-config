@@ -13,6 +13,9 @@ A401 is A451) and
 A389/A390 one higher (the first run crashed the firmware with "callback not
 found: A427", 27.0's get_color_remap_mode, 27.2's A477): outgoing tags
 are renumbered at push time; the 27.0 table stays as it is for the T6050.
+Without apple,max-brightness the panel gets the desktop 600-nit SDR ceiling,
+as on 26.x: with none, no swap was submitted (logged as "swap failed!
+status -1", now named as such).
 It is off until appledrm.t6041_fw27=1 (nix-config specialisation display-27).
 (github:briheet/nixos-m4pro docs/display/dcp-27.2-kernel.md, dcp-27.2-rpc.md)
 --- a/drivers/gpu/drm/apple/dcp-internal.h
@@ -146,7 +149,23 @@ It is off until appledrm.t6041_fw27=1 (nix-config specialisation display-27).
  		dev_info(dev, "coprocessor handoff: CPU_CONTROL %#x CPU_STATUS %#x\n",
  			 readl_relaxed(dcp->coproc_reg + APPLE_DCP_COPROC_CPU_CONTROL),
  			 readl_relaxed(dcp->coproc_reg + APPLE_DCP_COPROC_CPU_STATUS));
-@@ -6414,6 +6459,16 @@
+@@ -5740,6 +5785,15 @@
+ 		} else if (of_device_is_available(panel_np)) {
+ 			ret = of_property_read_u32(panel_np, "apple,max-brightness",
+ 						   &dcp->brightness.maximum);
++			/*
++			 * T6041 on 27.2: its swaps carry nits as on desktop 26.x;
++			 * without a ceiling no swap is submitted at all. Take the
++			 * J616s/J614s panel's user-accessible SDR maximum.
++			 */
++			if (ret && dcp->fw_v27_2) {
++				dcp->brightness.maximum = DCP_DESKTOP_MAX_NITS;
++				ret = 0;
++			}
+ 			if (ret)
+ 				dev_err(dev, "Missing property 'apple,max-brightness'\n");
+ 		}
+@@ -6414,6 +6468,16 @@
  	if (fw_compat == DCP_FIRMWARE_V_27_0 &&
  	    of_device_is_compatible(dev->of_node, "apple,t8142-dcp"))
  		dcp->hw.iomfb_method_profile = DCP_IOMFB_METHODS_DEFAULT;
@@ -163,6 +182,19 @@ It is off until appledrm.t6041_fw27=1 (nix-config specialisation display-27).
  	/* The display such a processor finds at boot is its first sink. */
  	if (dcp_sink_metadata(dcp))
  		dcp_desktop_metadata_new_sink(dcp);
+--- a/drivers/gpu/drm/apple/iomfb_template.c
++++ b/drivers/gpu/drm/apple/iomfb_template.c
+@@ -388,6 +388,10 @@
+ 	if (dcp->hw.iomfb_method_profile != DCP_IOMFB_METHODS_H17G) {
+ 		iomfb_serialize_present_h17p(&dcp->present_h17p, request);
+ 		if (!iomfb_apply_backlight_h17p(dcp, request, &dcp->present_h17p)) {
++			/* Not sent: the "swap failed" that follows is ours, not the firmware's. */
++			dev_warn_ratelimited(dcp->dev,
++					     "swap not submitted: no backlight state (maximum %u)\n",
++					     dcp->brightness.maximum);
+ 			if (cb)
+ 				cb(dcp, NULL, cookie);
+ 			return;
 --- a/drivers/gpu/drm/apple/iomfb.c
 +++ b/drivers/gpu/drm/apple/iomfb.c
 @@ -960,6 +960,8 @@
