@@ -8,13 +8,13 @@ On that path, like the T6050: adopt the running session and open no DPTX
 port services on the panel processor; no firmware clock ids (the T6041
 device tree names none); the desktop shared-memory mapping (buffers in
 linear-mapped RAM, which memremap(WC) refuses); and log the coprocessor
-handoff state. 27.2 numbers its methods A402-A499 50 higher than 27.0 and
+handoff state. 27.2 numbers its methods A400-A499 50 higher than 27.0 (start_signal
+A401 is A451) and
 A389/A390 one higher (the first run crashed the firmware with "callback not
 found: A427", 27.0's get_color_remap_mode, 27.2's A477): outgoing tags
 are renumbered at push time; the 27.0 table stays as it is for the T6050.
 t6041_fw27=0 refuses the 27.2 firmware instead.
 (github:briheet/nixos-m4pro docs/display/dcp-27.2-kernel.md, dcp-27.2-rpc.md)
-
 --- a/drivers/gpu/drm/apple/dcp-internal.h
 +++ b/drivers/gpu/drm/apple/dcp-internal.h
 @@ -465,6 +465,12 @@
@@ -23,7 +23,7 @@ t6041_fw27=0 refuses the 27.2 firmware instead.
  	enum dcp_firmware_version fw_compat;
 +	/*
 +	 * macOS 27.2 firmware on the firmware-27 interface (T6041, j614s): its
-+	 * methods A402-A499 are numbered 50 higher than 27.0's, and A389/A390
++	 * methods A400-A499 are numbered 50 higher than 27.0's, and A389/A390
 +	 * one higher (see dcp_retag_v27_2()).
 +	 */
 +	bool fw_v27_2;
@@ -37,7 +37,7 @@ t6041_fw27=0 refuses the 27.2 firmware instead.
 +
 +/*
 + * The 27.2 number of a 27.0 method tag (nixos-m4pro docs/display/dcp-27.2-rpc.md):
-+ * A402-A499 move up by 50 (A402-A449 no longer exist), A389/A390 by one. The
++ * A400-A499 move up by 50, A389/A390 by one. The
 + * callbacks the firmware calls (D###) keep their numbers.
 + */
 +static inline void dcp_retag_v27_2(char tag[4])
@@ -48,7 +48,7 @@ t6041_fw27=0 refuses the 27.2 firmware instead.
 +	    tag[2] > '9' || tag[3] < '0' || tag[3] > '9')
 +		return;
 +	n = (tag[1] - '0') * 100 + (tag[2] - '0') * 10 + (tag[3] - '0');
-+	if (n >= 402 && n <= 499)
++	if (n >= 400 && n <= 499)	/* start_signal A401 -> A451 included */
 +		n += 50;
 +	else if (n == 389 || n == 390)
 +		n += 1;
