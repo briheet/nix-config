@@ -34,13 +34,11 @@
         patches = patchesIn ./display-patches;
       })
     ];
-  # While the internal display on the 27.2 firmware is brought up, the display
-  # driver does not load at boot: aura enables the display nodes, and the boot
-  # framebuffer keeps the panel until appledrm is loaded by hand (logged out).
-  # Remove this once it works. On the command line, so that it holds in the
-  # initrd too (which carries appledrm.ko but not the system's modprobe.d).
-  boot.blacklistedKernelModules = [ "appledrm" ];
-  boot.kernelParams = [ "modprobe.blacklist=appledrm" ];
+  # appledrm always loads: the GPU driver needs its symbols. While the
+  # internal display on the 27.2 firmware is brought up, a DCP that fails
+  # leaves the panel to the boot framebuffer (simpledrm), and
+  # `appledrm.t6041_fw27=0` on the kernel command line (GRUB `e`) keeps it
+  # off the DCP altogether.
 
   # The keyboard and trackpad probe in the initrd.
   boot.initrd.extraFirmwarePaths = [ "apple/tpmtfw-j614s.bin" ];
