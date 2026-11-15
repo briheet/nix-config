@@ -1,0 +1,237 @@
+kboot_display_handoff: T6041 internal display on the macOS 27.2 firmware
+
+The T6041 (M4 Pro) display handoff qualified only the 26.6.2 OS firmware,
+so on 27.2 aura logged "no qualified OS firmware for apple,t6041-dcp:
+nothing done" and the panel stayed on the boot framebuffer. Every other
+check passes on this Mac's 27.2 ADT (mBoot-20457.41.3): addresses, SIDs,
+DVA windows, page-table regions, OS log buffers and the firmware segments,
+with one more 16K heap segment (region-id-157). Qualify 27.2 as a second
+firmware for the J616s/J614s record only, pin its DCP image
+(71F140DC-F18D-31B3-9772-537A5CC8400D), and publish firmware-version
+<27 2 0> with firmware-compat <27 0 0>: the kernel display driver's
+firmware-27 interface. Host tests os-27-2, os-27-2-other-image, os-27-0.
+(github:briheet/nixos-m4pro docs/display/dcp-27.2-aura.md)
+
+--- a/src/kboot_display_handoff.c
++++ b/src/kboot_display_handoff.c
+@@ -254,6 +254,14 @@
+     const char *uuid; /* DCP firmware image; NULL: none pinned, dry run only (unless any_uuid) */
+     u32 os_fw;        /* enum fw_version the kernel's DCP interface is written for */
+     const char *os_fw_name;
++    /*
++     * A second qualified OS firmware (V_UNKNOWN: none), the DCP image pinned for it (its iBoot
++     * version alone may not tell point releases apart, as 27.0's does not) and the release
++     * published as apple,firmware-compat for it: the kernel interface that drives it.
++     */
++    u32 os_fw2;
++    const char *os_fw2_name, *os_fw2_uuid;
++    u32 os_fw2_compat;
+     /* Nonzero: the ADT must say the same. Zero: taken from the ADT. */
+     u64 coproc, dart_dcp, dart_disp;
+     u64 vm_base, vm_size; /* both DARTs' DVA window (vm-base, vm-size, apple,dma-range) */
+@@ -395,9 +403,12 @@
+  * T6041 display block of the M4 Pro (T6040, J616s), with the desktop 26.6.2 DCP firmware. The DCP
+  * maps through dart-dcp SID 23 and the display and its piodma through dart-disp0 SIDs 0 and 16, of
+  * 32 streams each (ADT sid, sid-count, l2-tt-N). The addresses are this ADT's, after the arm-io
+- * ranges; segments and the display power state come from the ADT. The DCP image is not pinned:
+- * the kernel accepts only the 26.6.2 firmware. No opt-in: nothing happens unless the device tree
+- * describes this display block (dcp6_dt_describes()), and the display nodes stay disabled.
++ * ranges; segments and the display power state come from the ADT. The DCP image is not pinned
++ * for 26.6.2: the kernel accepts only that firmware. macOS 27.2 (J614s, mBoot-20457.41.3) leaves
++ * the same block running with the same SIDs, DVA windows and carveouts (one more 16K heap
++ * segment, region-id-157); its DCP image is pinned and published as compatible with the kernel's
++ * 27.0 interface. No opt-in: nothing happens unless the device tree describes this display block
++ * (dcp6_dt_describes()), and the display nodes stay disabled.
+  */
+ static const char *const dcp_boards_t6041[] = {"apple,j616s", "apple,j614s", NULL};
+ 
+@@ -422,6 +433,10 @@
+     .streams = 32,
+     .os_fw = V26_6_2,
+     .os_fw_name = "26.6.2",
++    .os_fw2 = V27_2,
++    .os_fw2_name = "27.2",
++    .os_fw2_uuid = "71F140DC-F18D-31B3-9772-537A5CC8400D",
++    .os_fw2_compat = V27_0,
+     .coproc = 0x402e00000UL,
+     .dart_dcp = 0x402340000UL,
+     .dart_disp = 0x402300000UL,
+@@ -1358,6 +1373,29 @@
+     return &fw_versions[firmware_os_components()];
+ }
+ 
++/* The OS firmware is one the SoC's handoff is qualified for */
++static bool dcp6_os_fw_ok(void)
++{
++    u32 v = firmware_os_components();
++    return v != V_UNKNOWN && (v == dcp6.soc->os_fw || (dcp6.soc->os_fw2 && v == dcp6.soc->os_fw2));
++}
++
++static bool dcp6_os_fw2(void)
++{
++    return dcp6.soc->os_fw2 && firmware_os_components() == dcp6.soc->os_fw2;
++}
++
++/*
++ * apple,firmware-compat: the release whose kernel interface drives the firmware. The release
++ * itself, except for os_fw2 (T6041 on 27.2: <27 0 0>, the kernel's firmware-27 interface).
++ */
++static const struct fw_version_info *dcp6_fw_compat(void)
++{
++    if (dcp6_os_fw2() && dcp6.soc->os_fw2_compat)
++        return &fw_versions[dcp6.soc->os_fw2_compat];
++    return dcp6_fw_release();
++}
++
+ static __attribute__((noinline)) void dcp6_describe(void)
+ {
+     static const char *const nodes[] = {
+@@ -2238,8 +2276,9 @@
+ 
+     if (chip_id != soc->chip)
+         bail("chip 0x%x is not %s\n", chip_id, soc->name);
+-    if (firmware_os_components() != soc->os_fw)
+-        bail("OS firmware %s is not %s\n", os_firmware.string, soc->os_fw_name);
++    if (!dcp6_os_fw_ok())
++        bail("OS firmware %s is not %s%s%s\n", os_firmware.string, soc->os_fw_name,
++             soc->os_fw2 ? " or " : "", soc->os_fw2 ? soc->os_fw2_name : "");
+ 
+     int nub = adt_path_offset(adt, DCP6_NUB);
+     u32 len = 0, preloaded, running;
+@@ -2255,6 +2294,8 @@
+     } else if (!uuid || len != strlen(soc->uuid) + 1 || memcmp(uuid, soc->uuid, len)) {
+         bail("dcp firmware is not image %s\n", soc->uuid);
+     }
++    if (dcp6_os_fw2() && soc->os_fw2_uuid && strcmp(uuid, soc->os_fw2_uuid))
++        bail("%s dcp firmware is not image %s\n", soc->os_fw2_name, soc->os_fw2_uuid);
+     memcpy(dcp6.uuid, uuid, len);
+     if (dcp6_adt_u32(nub, "pre-loaded", &preloaded) || preloaded != 1 ||
+         dcp6_adt_u32(nub, "running", &running) || running != 1)
+@@ -2422,7 +2463,7 @@
+     if (dcp < 0 || firmware_set_fdt(dt, dcp, "apple,firmware-version", dcp6_fw_release()))
+         return -1;
+     dcp = fdt_path_offset(dt, n->dcp);
+-    if (dcp < 0 || firmware_set_fdt(dt, dcp, "apple,firmware-compat", dcp6_fw_release()))
++    if (dcp < 0 || firmware_set_fdt(dt, dcp, "apple,firmware-compat", dcp6_fw_compat()))
+         return -1;
+     return 0;
+ }
+@@ -3130,7 +3171,7 @@
+         return -1;
+     node = fdt_path_offset(dt, ext->dt_path);
+     if (node < 0 || firmware_set_fdt(dt, node, "apple,firmware-version", dcp6_fw_release()) ||
+-        firmware_set_fdt(dt, node, "apple,firmware-compat", dcp6_fw_release()))
++        firmware_set_fdt(dt, node, "apple,firmware-compat", dcp6_fw_compat()))
+         return -1;
+     return 0;
+ }
+@@ -3754,8 +3795,7 @@
+     }
+ 
+     /* Reject unsupported firmware before reserving __OS_LOG or touching registers. */
+-    if (!dcp6.soc->optin &&
+-        (dcp6.soc->os_fw == V_UNKNOWN || firmware_os_components() != dcp6.soc->os_fw)) {
++    if (!dcp6.soc->optin && !dcp6_os_fw_ok()) {
+         dlog("no qualified OS firmware for %s: nothing done\n", dcp6.soc->dcp_compat);
+         return 0;
+     }
+--- a/tests/t6041_display_host.c
++++ b/tests/t6041_display_host.c
+@@ -48,9 +48,11 @@
+ volatile enum exc_guard_t exc_guard;
+ volatile int exc_count;
+ struct fw_version_info os_firmware;
+-const struct fw_version_info fw_versions[V26_6_2 + 1] = {
++const struct fw_version_info fw_versions[V27_2 + 1] = {
+     [V14_7] = {V14_7, "14.7", {14, 7, 0}, 3, "iBoot"},
+     [V26_6_2] = {V26_6_2, "26.6.2", {26, 6, 2}, 3, "mBoot-18000.161.10"},
++    [V27_0] = {V27_0, "27.0", {27, 0, 0}, 3, "mBoot-20457.1.29"},
++    [V27_2] = {V27_2, "27.2", {27, 2, 0}, 3, "mBoot-20457.41.3"},
+ };
+ 
+ /* As src/firmware.c: an iBoot of the 18000.161.10 train loads the 26.6.2 images. */
+@@ -454,6 +456,7 @@
+ #define MARKER     "apple,t6041-handoff"
+ #define OPTIN      "asahi,t6041-dcp" /* the removed opt-in, for the stale-optin scenario */
+ #define DCP_UUID   "8E5C2B1A-4F7D-3A6E-9B0C-1D2E3F405162"
++#define DCP_UUID27 "71F140DC-F18D-31B3-9772-537A5CC8400D" /* the 27.2 image the profile pins */
+ #define EXT0       0x3a2e00000ULL
+ #define EXT1       0x602e00000ULL
+ #define EXT_DART0  0x3a2340000ULL
+@@ -852,6 +855,10 @@
+ }
+ 
+ /* What aura publishes for the kernel's T6041 display gate and DCP driver */
++/* What the published dcp node must name: the 26.6.2 images unless a scenario says otherwise */
++static const char *want_uuid = DCP_UUID;
++static u32 want_version[3] = {26, 6, 2}, want_compat[3] = {26, 6, 2};
++
+ static void contract_check(const void *dt)
+ {
+     int dcp = alias_node(dt, "dcp"), disp = alias_node(dt, "disp0");
+@@ -868,11 +875,11 @@
+               status_is(dt, fdt_node_offset_by_phandle(dt, PH_MBOX), "disabled"),
+           "published: dcp, display, both DARTs and the mailbox left disabled, piodma untouched");
+     const char *uuid = fdt_getprop(dt, dcp, "apple,firmware-uuid", NULL);
+-    check(uuid && !strcmp(uuid, DCP_UUID), "published: dcp apple,firmware-uuid is the ADT's");
+-    const u32 v26[3] = {26, 6, 2};
+-    check(u32s_are(dt, dcp, "apple,firmware-version", v26, 3) &&
+-              u32s_are(dt, dcp, "apple,firmware-compat", v26, 3),
+-          "published: dcp apple,firmware-version and -compat are the 26.6.2 images");
++    check(uuid && !strcmp(uuid, want_uuid), "published: dcp apple,firmware-uuid is the ADT's");
++    check(u32s_are(dt, dcp, "apple,firmware-version", want_version, 3) &&
++              u32s_are(dt, dcp, "apple,firmware-compat", want_compat, 3),
++          "published: dcp apple,firmware-version <%u %u %u>, -compat <%u %u %u>", want_version[0],
++          want_version[1], want_version[2], want_compat[0], want_compat[1], want_compat[2]);
+ 
+     check(linked_segments(dt, dcp) == (1u << NSEGS) - 1 && region_count(dt, dcp) == NSEGS,
+           "published: every iop-dcp-nub segment is one dcp memory-region");
+@@ -1002,6 +1009,9 @@
+     {"repeat", PUBLISH, "a second call adds nothing"},
+     {"oslog-in-memreserve", PUBLISH, "an __OS_LOG wholly inside a /memreserve/ is still described"},
+     {"os-26-7-train", PUBLISH, "26.7.1 booted by an 18000.161.10 train iBoot publishes the 26.6.2 images"},
++    {"os-27-2", PUBLISH, "27.2 with its pinned DCP image publishes <27 2 0>, compat <27 0 0>"},
++    {"os-27-2-other-image", REFUSE, "27.2 with another DCP image publishes nothing"},
++    {"os-27-0", NOTHING, "OS firmware 27.0 is not qualified on T6041"},
+     /* chip, board and device tree */
+     {"wrong-chip", NOTHING, "chip T6041 with a T6040 device tree"},
+     {"wrong-board", NOTHING, "an unsupported T6040 board"},
+@@ -1129,6 +1139,16 @@
+         os_firmware = (struct fw_version_info){V14_7, "14.7", {14, 7, 0}, 3, "iBoot"};
+     if (is(s, "os-26-7-train"))
+         os_firmware = (struct fw_version_info){V26_7, "26.7", {26, 7, 0}, 3, "mBoot-18000.161.10.701.1"};
++    if (is(s, "os-27-2") || is(s, "os-27-2-other-image") || is(s, "os-27-0")) {
++        bool v27_2 = !is(s, "os-27-0");
++        os_firmware = fw_versions[v27_2 ? V27_2 : V27_0];
++        if (is(s, "os-27-2")) {
++            prop_str("/arm-io/dcp/iop-dcp-nub", "uuid", DCP_UUID27);
++            want_uuid = DCP_UUID27;
++            want_version[0] = 27, want_version[1] = 2, want_version[2] = 0;
++            want_compat[0] = 27, want_compat[1] = 0, want_compat[2] = 0;
++        }
++    }
+     if (is(s, "unknown-os"))
+         os_firmware = (struct fw_version_info){V_UNKNOWN, "unknown", {0}, 0, "unknown"};
+     if (is(s, "bad-uuid"))
+--- a/tests/t8122_display_host/firmware.h
++++ b/tests/t8122_display_host/firmware.h
+@@ -12,6 +12,7 @@
+     V26_6_2 = 102,
+     V26_7 = 103,
+     V27_0 = 104,
++    V27_2 = 105,
+ };
+ struct fw_version_info {
+     enum fw_version version;
+--- a/tests/python/test_t6041_display_handoff.py
++++ b/tests/python/test_t6041_display_handoff.py
+@@ -95,6 +95,9 @@
+     "repeat": "handoff already published",
+     "oslog-in-memreserve": "lies inside /memreserve/",
+     "os-26-7-train": PUBLISHED,
++    "os-27-2": PUBLISHED,
++    "os-27-2-other-image": "27.2 dcp firmware is not image 71F140DC-F18D-31B3-9772-537A5CC8400D",
++    "os-27-0": "no qualified OS firmware for apple,t6041-dcp: nothing done",
+     "wrong-chip": "not a J616s/J614s (chip 0x6041): nothing done",
+     "wrong-board": "not a J616s/J614s (chip 0x6040): nothing done",
+     "j614-no-optin": PUBLISHED,
