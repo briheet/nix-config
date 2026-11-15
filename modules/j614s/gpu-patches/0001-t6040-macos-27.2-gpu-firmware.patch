@@ -1,0 +1,1108 @@
+drm/asahi: T6040 (M4 Pro) on the macOS 27.2 GPU firmware
+
+nixos-aurora's driver supports the M4 Pro's macOS 26.6.2 GPU firmware
+(25G83). This adds the 27.2 build as variant V27_2, which keeps the 25G83
+initialization graph with the layout and protocol changes of 27.2. Derived
+from a static decode of the 27.2 firmware and macOS 27.2 snapshots
+(github:briheet/nixos-m4pro docs/gpu/driver-27.2-diff.md, probe log
+driver-27.2-probes.md). Needs aura's three-segment GPU handoff
+(../aura-patches/0001).
+
+Identification and segments:
+- hw/t6040.rs: the 27.2 loaded image (TEXT 0x64000, DATA 0xc4000, entropy
+  0x5d88c/0x5d96f, sha256 eda53a91...).
+- data_segment.rs: the firmware asks for its RTKit buffers in its third
+  segment, __DATA_SHARED_RO (apple,fw-data-shared-ro).
+
+InitData (fw/initdata/v27_2.rs, initdata/v25g83.rs):
+- interface version 0x0c8b6339839804c0; opening record 0x15;
+- MainConfig: power_config_va at +0x481, no +0x18 page, +0x308/+0x30c,
+  +0x320..+0x328 as macOS;
+- hardware data, power configuration, power state and Region C moved to
+  their 27.2 offsets in runs, with macOS 27.2's constants (each checked
+  word by word against macOS's blocks at its InitData message);
+  hardware data +0x2730 stays 0 so the firmware installs the queues;
+- status B's recovery and firmware-control words 0x1e0 later; +0xe714 = 1.
+
+Runtime:
+- device control: scheduler-state release 0x13 (27.2's 0x14 stores through
+  the record), the 27.2 power-assert rule (0x08, 0x09, 0x0a, 0x29), the live
+  Region C fields 4 bytes later; the host idle timestamp (Region C +0x98c,
+  record 0x22) before keep-powered, as macOS;
+- queues: the A18 Pro pointer layout, 0x80-byte (M5) queue records for
+  render and compute, a render configuration with every kick, kick-entry
+  dependency control bits 63:48 = 0x0fa0.
+
+--- a/drivers/gpu/drm/asahi/g17/data_segment.rs
++++ b/drivers/gpu/drm/asahi/g17/data_segment.rs
+@@ -11,6 +11,10 @@
+ //! A firmware that places its own crash log ([`super::CrashBuffers::FirmwareData`]) asks for it
+ //! by physical address inside its data segment, the `fw-data` reserved region, which the boot
+ //! loader keeps for the loaded firmware until reboot.
++//!
++//! The macOS 27.2 firmware of the M4 Pro (j614s patch) has a third segment, `__DATA_SHARED_RO`,
++//! in its own region (the ADT's `gfx-data-shared-ro`), and asks for its buffers there. aura
++//! reserves it and publishes it as `apple,fw-data-shared-ro` (base, size).
+ 
+ use kernel::{
+     c_str, device,
+@@ -31,14 +35,23 @@
+ 
+ impl DataSegmentLog {
+     /// Maps the `size` bytes at physical address `iova` that the firmware asked for, which
+-    /// must lie inside the `fw-data` region of `dev`.
++    /// must lie inside the `fw-data` region of `dev`, or inside `apple,fw-data-shared-ro`.
+     pub(super) fn map(dev: &device::Device, iova: usize, size: usize) -> Result<Self> {
+         let node = dev.of_node().ok_or(EINVAL)?;
+         let res = node.reserved_mem_region_to_resource_byname(c_str!("fw-data"))?;
+-        let offset = iova.checked_sub(res.start().try_into()?).ok_or(EINVAL)?;
+-        if offset.checked_add(size).ok_or(EINVAL)? > res.size().try_into()? {
+-            return Err(EINVAL);
+-        }
++        let (res, offset) = match offset_in(res.start() as u64, res.size() as u64, iova, size) {
++            Some(offset) => (res, offset),
++            None => {
++                let cells = node
++                    .get_property::<KVec<u32>>(c_str!("apple,fw-data-shared-ro"))
++                    .map_err(|_| EINVAL)?;
++                let [b_hi, b_lo, s_hi, s_lo] = cells.as_slice().try_into().map_err(|_| EINVAL)?;
++                let start = (u64::from(b_hi) << 32) | u64::from(b_lo);
++                let len = (u64::from(s_hi) << 32) | u64::from(s_lo);
++                let offset = offset_in(start, len, iova, size).ok_or(EINVAL)?;
++                (memory_resource(start, len)?, offset)
++            }
++        };
+         // SAFETY: The boot loader reserved this RAM for the loaded GPU firmware, which keeps
+         // it until reboot; only the requested subrange is exposed.
+         let mem = unsafe { io::mem::Mem::try_new(res, io::mem::MemFlag::WB.into())? };
+@@ -54,3 +67,24 @@
+         Ok(IoSysMap::Sys(unsafe { io::SysMem::new(ptr) }))
+     }
+ }
++
++/// The offset of `size` bytes at `iova` inside `len` bytes at `start`, if they lie inside.
++fn offset_in(start: u64, len: u64, iova: usize, size: usize) -> Option<usize> {
++    let offset = (iova as u64).checked_sub(start)?;
++    (offset.checked_add(size as u64)? <= len).then_some(offset as usize)
++}
++
++/// A memory resource for `len` bytes at physical `start`.
++fn memory_resource(start: u64, len: u64) -> Result<io::resource::Resource> {
++    if len == 0 {
++        return Err(EINVAL);
++    }
++    // SAFETY: All-zero is a valid `struct resource` (no name, parent or children).
++    let mut raw: kernel::bindings::resource = unsafe { core::mem::zeroed() };
++    raw.start = start;
++    raw.end = start.checked_add(len - 1).ok_or(EINVAL)?;
++    raw.flags = kernel::bindings::IORESOURCE_MEM as usize;
++    // SAFETY: `Resource` is a transparent wrapper around `Opaque<bindings::resource>`, and `raw`
++    // describes a valid memory range (as `Uat::map_physical` builds it).
++    Ok(unsafe { core::mem::transmute(kernel::types::Opaque::new(raw)) })
++}
+--- a/drivers/gpu/drm/asahi/g17/fw/channels.rs
++++ b/drivers/gpu/drm/asahi/g17/fw/channels.rs
+@@ -304,6 +304,7 @@
+     FreeListRelease(FreeListRelease),
+     ContextKill(ContextKill),
+     ChannelErrorAck(ChannelErrorAck),
++    IdleTimestamp(IdleTimestamp),
+ }
+ 
+ impl ControlRecord {
+@@ -317,6 +318,7 @@
+             Self::FreeListRelease(_) => DeviceControlOp::FreeListRelease,
+             Self::ContextKill(_) => DeviceControlOp::ContextKill,
+             Self::ChannelErrorAck(_) => DeviceControlOp::ChannelErrorAck,
++            Self::IdleTimestamp(_) => DeviceControlOp::IdleTimestamp,
+         }
+     }
+ 
+@@ -329,6 +331,7 @@
+             Self::FreeListRelease(record) => core::ptr::from_ref(record).cast(),
+             Self::ContextKill(record) => core::ptr::from_ref(record).cast(),
+             Self::ChannelErrorAck(record) => core::ptr::from_ref(record).cast(),
++            Self::IdleTimestamp(record) => core::ptr::from_ref(record).cast(),
+         };
+         // SAFETY: Each variant has a statically checked size of 0x40 bytes,
+         // contains only initialized integer fields with no implicit padding,
+@@ -355,6 +358,8 @@
+     FreeListRelease = 0x2e,
+     /// Stop the queues named by a closed logical scheduler.
+     ContextKill = 0x29,
++    /// 27.2: copy the host idle timestamp pair from Region C ([`IdleTimestamp`]).
++    IdleTimestamp = 0x22,
+ }
+ 
+ impl DeviceControlOp {
+@@ -456,6 +461,24 @@
+     }
+ }
+ 
++/// 27.2 (j614s patch): the firmware copies the host's idle timestamp pair (Region C +0x98c:
++/// the system counter, then the power period in its clocks) when it drains this record; the
++/// record has no fields. macOS 27.2 sends it before its first kick and through its life.
++#[repr(C)]
++#[derive(Debug)]
++pub(crate) struct IdleTimestamp {
++    pub(crate) opcode: u32,
++    pub(crate) unk_04: [u8; 0x3c],
++}
++
++static_assert!(size_of::<IdleTimestamp>() == DEVICE_CONTROL_RECORD_SIZE);
++
++impl IdleTimestamp {
++    pub(crate) const fn new() -> Self {
++        Self { opcode: DeviceControlOp::IdleTimestamp as u32, unk_04: [0; 0x3c] }
++    }
++}
++
+ /// Releases the scheduler state of a logical queue whose work has drained.
+ ///
+ /// The page may be freed once the firmware has consumed the record.
+--- a/drivers/gpu/drm/asahi/g17/fw/initdata/v27_2.rs
++++ b/drivers/gpu/drm/asahi/g17/fw/initdata/v27_2.rs
+@@ -0,0 +1,327 @@
++// SPDX-License-Identifier: GPL-2.0-only OR MIT
++
++//! The data blocks of the macOS 27.2 firmware of the M4 Pro (j614s patch).
++//!
++//! 27.2 keeps the 25G83 hardware data and power configuration, moved in runs and with a few
++//! other constants (nixos-m4pro docs/gpu/driver-27.2-diff.md §7, §9, §10). The driver builds
++//! the 25G83 blocks as before and [`hw_data`] and [`power_config`] move them to their 27.2
++//! offsets; each run and value was checked word by word against macOS 27.2's blocks at its
++//! InitData message. What macOS writes that is not here: the words at +0xe0..+0x5ec of the
++//! hardware data (left zero, as the 25G83 driver does) and the fractions of the table A
++//! relative performance (the device tree has whole percents).
++
++use crate::float::F32;
++use kernel::prelude::*;
++
++/// Size of the 25G83 hardware data ([`super::v25g83::HwData25G83`]).
++pub(crate) const HW_DATA_25G83: usize = 0x3db4;
++/// Size of the 27.2 hardware data; the bundle's first view follows it under macOS.
++pub(crate) const HW_DATA: usize = 0x2880;
++/// Size of the 25G83 power configuration ([`super::v25g83::PowerConfig25G83`]).
++pub(crate) const POWER_CONFIG_25G83: usize = 0x6510;
++
++/// A run of `len` bytes at 25G83 offset `from`, at 27.2 offset `to`.
++struct Run {
++    from: usize,
++    to: usize,
++    len: usize,
++}
++
++const fn run(from: usize, end: usize, to: usize) -> Run {
++    Run {
++        from,
++        to,
++        len: end - from,
++    }
++}
++
++const REGISTER_MAP: usize = 0x640;
++const REGISTER_MAP_ENTRY: usize = 0x28;
++/// Register-map slots: 53 in 25G83, 60 in 27.2. Slots from 23 on moved up by 5.
++const SLOTS_25G83: usize = 53;
++const SLOTS: usize = 60;
++const fn slot_27_2(slot: usize) -> usize {
++    if slot < 23 {
++        slot
++    } else {
++        slot + 5
++    }
++}
++/// Empty slots macOS marks with flags 2.
++const RESERVED_SLOTS: [usize; 17] = [
++    2, 5, 6, 7, 8, 25, 26, 27, 32, 35, 43, 47, 52, 53, 54, 55, 58,
++];
++/// The slot of the GPU SRAM window (phys 0x2_88d6_0000; 25G83 slot 32).
++const SRAM_SLOT: usize = 37;
++
++const HW_DATA_RUNS: [Run; 5] = [
++    run(0, REGISTER_MAP, 0),
++    // chip_id .. unk_eb8; 25G83's unk_ebc is gone.
++    run(0xe90, 0xebc, 0xfb0),
++    // unk_ec0 .. unk_25fc: the performance tables and the core counts.
++    run(0xec0, 0x2600, 0xfdc),
++    // unk_2614 .. qos_va: the completion rings.
++    run(0x2614, 0x26c0, 0x2734),
++    // From unk_26c0: after the new pointer at +0x27e0.
++    run(0x26c0, 0x2758, 0x27e8),
++];
++
++/// Words macOS 27.2 writes differently, at 27.2 offsets.
++const HW_DATA_WORDS: [(usize, u32); 7] = [
++    (0x1044, 0xc),
++    (0x1088, 1),
++    // Core slots (2 x 10), not enabled cores.
++    (0x10a4, 20),
++    (0x10d4, 0x13),
++    (0x10dc, 20),
++    (0x26b0, 0x1e_0000),
++    // sched_pause_timeout_us.
++    (0x271c, 150),
++    // +0x2730 stays 0 (macOS writes 1): nonzero, the firmware's queue install (tag 0xf) writes
++    // nothing to the KSM and leaves the queues to a host-side install (driver-27.2-diff.md
++    // §18.3); zero, the firmware installs them itself, as under 25G83.
++];
++const HW_DATA_BYTES: [(usize, u8); 2] = [(0x2846, 1), (0x284a, 1)];
++
++/// Table A in 27.2: core voltages per lane at +0x44, SRAM voltages at +0x444.
++const PERF_A: usize = 0x10e0;
++const PERF_A_FREQ: usize = PERF_A + 4;
++const PERF_A_CORE_MV: usize = PERF_A + 0x44;
++const PERF_A_SRAM_MV: usize = PERF_A + 0x444;
++const PERF_STATES: usize = 11;
++const PERF_LANES: usize = 16;
++/// Relative performance of tables A and B, f32 in 27.2 (u32 percents in 25G83).
++const RELATIVE_A: usize = 0x19e4;
++const RELATIVE_B: usize = 0x1a24;
++const RELATIVE_A_25G83: usize = 0x18c8;
++const RELATIVE_B_25G83: usize = 0x1908;
++/// The CS performance table, which macOS leaves zero.
++const CS_PERF: usize = 0x1b64;
++const AUX_PERF_TABLE: usize = 0x148;
++const SRAM_POINTER: usize = 0xfa0;
++const SRAM_SIZE: u64 = 0x8000;
++/// A page macOS names at +0x27e0, 0x8000 below the QoS object; zero at boot.
++const EXTRA_POINTER: usize = 0x27e0;
++
++fn get(bytes: &[u8], at: usize) -> Result<u32> {
++    let word = bytes.get(at..at + 4).ok_or(EINVAL)?;
++    Ok(u32::from_le_bytes(word.try_into().map_err(|_| EINVAL)?))
++}
++
++fn put(bytes: &mut [u8], at: usize, value: &[u8]) -> Result {
++    bytes
++        .get_mut(at..at + value.len())
++        .ok_or(EINVAL)?
++        .copy_from_slice(value);
++    Ok(())
++}
++
++/// Moves `runs` of `block` (as built for 25G83, `block.len()` bytes) to their 27.2 offsets,
++/// zeroing everything else, and returns the 25G83 copy.
++fn relayout(block: &mut [u8], runs: &[Run]) -> Result<KVVec<u8>> {
++    let mut old = KVVec::from_elem(0u8, block.len(), GFP_KERNEL)?;
++    old.copy_from_slice(block);
++    block.fill(0);
++    for r in runs {
++        let from = old.get(r.from..r.from + r.len).ok_or(EINVAL)?;
++        put(block, r.to, from)?;
++    }
++    Ok(old)
++}
++
++/// Moves the 25G83 hardware data in `block` to the 27.2 layout. `lanes` is the number of
++/// voltage lanes the 25G83 table A filled (one per cluster); `extra_va` is a zeroed page.
++pub(crate) fn hw_data(block: &mut [u8], lanes: usize, extra_va: u64) -> Result {
++    if block.len() != HW_DATA_25G83 || !(1..=PERF_LANES).contains(&lanes) {
++        return Err(EINVAL);
++    }
++    let old = relayout(block, &HW_DATA_RUNS)?;
++    let entry = |slot: usize| REGISTER_MAP + slot * REGISTER_MAP_ENTRY;
++    for slot in 0..SLOTS_25G83 {
++        let from = old.get(entry(slot)..entry(slot + 1)).ok_or(EINVAL)?;
++        put(block, entry(slot_27_2(slot)), from)?;
++    }
++    for slot in RESERVED_SLOTS {
++        if slot >= SLOTS || block[entry(slot)..entry(slot + 1)].iter().any(|&b| b != 0) {
++            return Err(EINVAL);
++        }
++        put(block, entry(slot) + 0x20, &2u32.to_le_bytes())?;
++    }
++    // The SRAM pointer names the SRAM window the register map already maps.
++    let sram = entry(SRAM_SLOT);
++    let sram_va = u64::from(get(block, sram + 8)?) | (u64::from(get(block, sram + 12)?) << 32);
++    if get(block, sram)? != 0x88d6_0000 || sram_va == 0 {
++        return Err(EINVAL);
++    }
++    put(block, SRAM_POINTER, &sram_va.to_le_bytes())?;
++    put(block, SRAM_POINTER + 8, &SRAM_SIZE.to_le_bytes())?;
++    put(block, EXTRA_POINTER, &extra_va.to_le_bytes())?;
++    for (at, value) in HW_DATA_WORDS {
++        put(block, at, &value.to_le_bytes())?;
++    }
++    for (at, value) in HW_DATA_BYTES {
++        put(block, at, &[value])?;
++    }
++    block[CS_PERF..CS_PERF + AUX_PERF_TABLE].fill(0);
++
++    // Every lane of table A carries the first lane's voltages.
++    for state in 0..PERF_STATES {
++        for base in [PERF_A_CORE_MV, PERF_A_SRAM_MV] {
++            let row = base + state * PERF_LANES * 4;
++            let first = get(block, row)?;
++            for lane in lanes..PERF_LANES {
++                put(block, row + lane * 4, &first.to_le_bytes())?;
++            }
++        }
++    }
++
++    // Relative performance as f32: table A from its whole percents; table B exactly, as the
++    // share of table A's frequency range above its first state.
++    let hundred = F32::from(100u32);
++    let relative_b: [u32; PERF_STATES] = core::array::from_fn(|i| {
++        old.get(RELATIVE_B_25G83 + 4 * i..RELATIVE_B_25G83 + 4 * i + 4)
++            .map_or(0, |w| u32::from_le_bytes([w[0], w[1], w[2], w[3]]))
++    });
++    let base = relative_b.iter().take_while(|&&v| v == 0).count().saturating_sub(1);
++    let mut freq = [0u32; PERF_STATES];
++    for (i, f) in freq.iter_mut().enumerate() {
++        *f = get(block, PERF_A_FREQ + 4 * i)?;
++    }
++    let (low, top) = (freq[base], freq[PERF_STATES - 1]);
++    if top <= low {
++        return Err(EINVAL);
++    }
++    for i in 0..PERF_STATES {
++        let a = F32::from(get(&old, RELATIVE_A_25G83 + 4 * i)?);
++        put(block, RELATIVE_A + 4 * i, &a.to_bits().to_le_bytes())?;
++        let b = match i > base {
++            true => {
++                hundred * F32::from(freq[i].saturating_sub(low)) / F32::from(top - low)
++            }
++            false => F32::from(0u32),
++        };
++        put(block, RELATIVE_B + 4 * i, &b.to_bits().to_le_bytes())?;
++    }
++    Ok(())
++}
++
++const POWER_CONFIG_RUNS: [Run; 6] = [
++    run(0, 0xc0, 0),
++    run(0xc0, 0x2874, 0xd0),
++    run(0x2874, 0x2c48, 0x289c),
++    // 8 bytes fewer between 0x2c48 and 0x2e2c.
++    run(0x2c50, 0x3b50, 0x2c70),
++    // The config status pointer (0x3b50) and what follows.
++    run(0x3b50, 0x5b70, 0x3b98),
++    // The AON table pointer and its sensor names. The entropy and leakage words after them
++    // (0x63d4, 0x6420, 0x642c..) have no place in 27.2: macOS leaves that range zero.
++    run(0x6318, 0x6378, 0x6340),
++];
++
++/// Words macOS 27.2 writes differently, at 27.2 offsets.
++const POWER_CONFIG_WORDS: [(usize, u32); 10] = [
++    (0x9c, 1),
++    (0xa0, 1),
++    (0xa4, 1),
++    (0xa8, 1),
++    // -0.0176 (25G83: -0.0145).
++    (0x9fc, 0xbc90_4e81),
++    // 40 (25G83: 100).
++    (0xa00, 40),
++    (0xab8, 40),
++    (0x22c0, 40),
++    (0x2c68, 40),
++    // 100.0 (25G83: the integer 100).
++    (0x2f0c, 0x42c8_0000),
++];
++
++/// Moves the 25G83 power configuration in `block` to the 27.2 layout.
++pub(crate) fn power_config(block: &mut [u8]) -> Result {
++    if block.len() != POWER_CONFIG_25G83 {
++        return Err(EINVAL);
++    }
++    relayout(block, &POWER_CONFIG_RUNS)?;
++    for (at, value) in POWER_CONFIG_WORDS {
++        put(block, at, &value.to_le_bytes())?;
++    }
++    Ok(())
++}
++
++/// Nonzero words of the 27.2 power state (our PowerMgmt27) at macOS 27.2's InitData message,
++/// besides the maximum power at [`POWER_STATE_MAX_POWER`]. +0xc8/+0xcc are the fast-die
++/// target and release temperatures (110.00 and 80.00 °C).
++pub(crate) const POWER_STATE_WORDS: [(usize, u32); 22] = [
++    (0x10, 0x1f),
++    (0x14, 0x3d25_bea1),
++    (0x18, 0x3f4f_2e49),
++    (0x1c, 0x28),
++    (0x20, 1),
++    (0xc8, 11_000),
++    (0xcc, 8_000),
++    (0xd8, 0x4214_0000),
++    (0xdc, 0x414e_eeee),
++    (0xf0, 0x26ac),
++    (0xf4, 0xc8),
++    (0x108, 0x42c8_0000),
++    (0x10c, 0x43c8_0000),
++    (0x110, 0xc8),
++    (0x128, 1),
++    (0x130, 0x3ecf_2e49),
++    (0x134, 0x3e3b_d7b3),
++    (0x624, 0x4170_0000),
++    (0x628, 0x40a0_0000),
++    (0x62c, 0x20),
++    (0x630, 0x3e8),
++    (0x640, 0x384),
++];
++/// Where the 27.2 power state holds the maximum power in mW.
++pub(crate) const POWER_STATE_MAX_POWER: usize = 0x12c;
++
++/// Size of Region C as the driver builds it.
++pub(crate) const REGION_C: usize = 0x1000;
++/// 27.2 has one more u32 at +0x34 (or +0x38: both give the same bytes); everything from 25G83's
++/// +0x34 on, the live effort, override and power-assert tally included, sits 4 bytes later.
++pub(crate) const REGION_C_SHIFT: usize = 4;
++
++/// Moves the 25G83 Region C in `block` to the 27.2 layout, with macOS 27.2's values.
++pub(crate) fn region_c(block: &mut [u8]) -> Result {
++    if block.len() != REGION_C {
++        return Err(EINVAL);
++    }
++    relayout(
++        block,
++        &[run(0, 0x34, 0), run(0x34, REGION_C - REGION_C_SHIFT, 0x34 + REGION_C_SHIFT)],
++    )?;
++    put(block, 0x34, &1u32.to_le_bytes())?;
++    // macOS 27.2's words at its InitData message that 25G83 leaves zero.
++    for (at, value) in [(0x9dcusize, 50u32), (0xe0c, 250)] {
++        put(block, at, &value.to_le_bytes())?;
++    }
++    Ok(())
++}
++
++/// Bits 63:48 of a kick entry's dependency control under macOS 27.2 (25G83: 0xffff).
++pub(crate) const KICK_DEPENDENCY_HIGH: u16 = 0x0fa0;
++/// Bits 63:48 of a kick entry's dependency control in use: 0xffff, or [`KICK_DEPENDENCY_HIGH`].
++static KICK_DEPENDENCY: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0xffff);
++
++/// Selects the 27.2 kick-entry dependency control (one GPU per system).
++pub(crate) fn set_kick_dependency_high(value: u16) {
++    KICK_DEPENDENCY.store(value.into(), core::sync::atomic::Ordering::Relaxed);
++}
++
++/// Bits 63:48 of the dependency control word, in place.
++pub(crate) fn kick_dependency_high() -> u64 {
++    u64::from(KICK_DEPENDENCY.load(core::sync::atomic::Ordering::Relaxed)) << 48
++}
++
++/// Status B's recovery words and firmware-control pointers (25G83 +0x40b8..+0x4910) are 0x1e0
++/// later in 27.2: recovery info +0x4298, slot mask +0x4ab8, firmware control +0x4ac0/+0x4ac8,
++/// epoch +0x4ad0, state +0x4ae0, host recovery +0x4af0 (nixos-m4pro driver-27.2-diff.md §6;
++/// the firmware-control pointers confirmed in macOS 27.2's status B at its InitData message).
++pub(crate) const STATUS_B_SHIFT: usize = 0x1e0;
++/// The status B word macOS 27.2 sets to 1 at start.
++pub(crate) const STATUS_B_E714: usize = 0xe714;
++
++/// Region C's host idle timestamp pair in 27.2 (u64 system counter, u64 period in its clocks).
++pub(crate) const REGION_C_IDLE_TIMESTAMP: usize = 0x98c;
+--- a/drivers/gpu/drm/asahi/g17/fw/initdata.rs
++++ b/drivers/gpu/drm/asahi/g17/fw/initdata.rs
+@@ -28,6 +28,7 @@
+ use super::clear;
+ 
+ pub(crate) mod v25g83;
++pub(crate) mod v27_2;
+ 
+ /// Interface version at root `+0x00`; the firmware rejects any other.
+ pub(crate) const INTERFACE_VERSION: [u16; 4] = [0x04c0, 0x0396, 0xa322, 0x0c8a];
+@@ -429,7 +430,7 @@
+ static_assert!(size_of::<OpeningRecord>() == 0x40);
+ 
+ impl OpeningRecord {
+-    const PRIMARY: u32 = 0x16;
++    pub(crate) const PRIMARY: u32 = 0x16;
+     const SECONDARY: u32 = 0x2a;
+ 
+     /// Returns the opening record of `role`.
+--- a/drivers/gpu/drm/asahi/g17/fw/kick.rs
++++ b/drivers/gpu/drm/asahi/g17/fw/kick.rs
+@@ -466,8 +466,8 @@
+     const QOS_SLOT_SHIFT: u32 = 32;
+     const QOS_CLASS_SHIFT: u32 = 40;
+     const QOS_CLASS_MAX: u8 = 0x1f;
+-    /// Bits 63:48 of the dependency control word.
+-    const UNK_DEPENDENCY_CONTROL: u64 = 0xffff << 48;
++    // Bits 63:48 of the dependency control word: 0xffff, or 27.2's
++    // (crate::g17::fw::initdata::v27_2::kick_dependency_high).
+     /// Required value of the last word of the entry.
+     const UNK_178: u64 = 0x003f_ffff_ffff_ffff;
+ 
+@@ -534,7 +534,7 @@
+             dependency_control: u64::from(mask)
+                 | u64::from(args.qos.slot) << Self::QOS_SLOT_SHIFT
+                 | u64::from(args.qos.class) << Self::QOS_CLASS_SHIFT
+-                | Self::UNK_DEPENDENCY_CONTROL,
++                | crate::g17::fw::initdata::v27_2::kick_dependency_high(),
+             dependencies,
+             event_mask: args.event_mask,
+             unk_148: 0,
+--- a/drivers/gpu/drm/asahi/g17/fw/variant.rs
++++ b/drivers/gpu/drm/asahi/g17/fw/variant.rs
+@@ -87,6 +87,24 @@
+     /// work. The bare-metal M5 firmware powers the cores for work by its own policy: under a
+     /// hold, the M5 Ultra's core-power witness reads unpowered until the hold is released.
+     pub(crate) registration_power_hold: bool,
++    /// The interface version the host writes at InitData `+0x00`; the firmware crashes with
++    /// "Host and FW Interface is mismatched" on any other.
++    pub(crate) interface_version: [u16; 4],
++    /// Opcode of the opening device-control record of the primary role.
++    pub(crate) opening_opcode: u32,
++    /// The 27.2 MainConfig of the 25G83 graph (j614s patch; nixos-m4pro
++    /// docs/gpu/driver-27.2-diff.md §4): `power_config_va` at +0x481 instead of +0x471, no
++    /// `unk_18` page, and macOS's words at +0x308/+0x30c and +0x320..+0x328.
++    pub(crate) main_config_27_2: bool,
++    /// The 27.2 hardware data, power configuration and power state (j614s patch;
++    /// [`super::initdata::v27_2`]).
++    pub(crate) data_27_2: bool,
++    /// The 27.2 queues (j614s patch; nixos-m4pro docs/gpu/driver-27.2-diff.md §18): 0x80-byte
++    /// queue records (the M5 layout) for render and compute, and a render configuration with
++    /// every kick. The item rings keep the 25G83 order ([lead], descriptor, configuration,
++    /// tag-14 announcement): the firmware installs the queues in the KSM (hardware data
++    /// +0x2730 = 0) and links each job when it dispatches the descriptor item.
++    pub(crate) queues_27_2: bool,
+ }
+ 
+ /// A firmware build a SoC supports, identified by its loaded TEXT.
+@@ -137,6 +155,11 @@
+     split_firmware_area: false,
+     m5_commands: false,
+     registration_power_hold: true,
++    interface_version: super::initdata::INTERFACE_VERSION,
++    opening_opcode: super::initdata::OpeningRecord::PRIMARY,
++    main_config_27_2: false,
++    data_27_2: false,
++    queues_27_2: false,
+ };
+ 
+ /// The M4 Pro firmware (25G83, `mBoot-18000.161.10`).
+@@ -171,6 +194,29 @@
+     split_firmware_area: false,
+     m5_commands: false,
+     registration_power_hold: true,
++    interface_version: super::initdata::INTERFACE_VERSION,
++    opening_opcode: super::initdata::OpeningRecord::PRIMARY,
++    main_config_27_2: false,
++    data_27_2: false,
++    queues_27_2: false,
++};
++
++/// The M4 Pro firmware of macOS 27.2 (j614s patch). Starts as the 25G83 rules; the layouts
++/// that differ in 27.2 are being moved here one by one (nixos-m4pro docs/gpu/driver-27.2-diff.md).
++pub(crate) const V27_2: Variant = Variant {
++    // 0x0c8b6339839804c0 (nixos-m4pro docs/gpu/firmware-decode.md).
++    interface_version: [0x04c0, 0x8398, 0x6339, 0x0c8b],
++    // The A18 Pro pointer layout: producer at +0x40, the replay write index (u32::MAX) at +0x50.
++    pointers: PointerLayout {
++        producer: 0x40,
++        recovery_target: Some(0x50),
++    },
++    // macOS's slot 0 at the InitData message (snapshot 01).
++    opening_opcode: 0x15,
++    main_config_27_2: true,
++    data_27_2: true,
++    queues_27_2: true,
++    ..V25G83
+ };
+ 
+ /// The 26A428 firmware of the M5 GPUs, which runs the M5 protocol (the M5 graph, queues and
+@@ -195,4 +241,5 @@
+     assert!(super::queue::PointerBlock::valid_layout(&V26A428.pointers));
+     assert!(super::queue::PointerBlock::valid_layout(&V25G83.pointers));
+     assert!(super::queue::PointerBlock::valid_layout(&V25F84.pointers));
++    assert!(super::queue::PointerBlock::valid_layout(&V27_2.pointers));
+ };
+--- a/drivers/gpu/drm/asahi/g17/initdata/v25g83.rs
++++ b/drivers/gpu/drm/asahi/g17/initdata/v25g83.rs
+@@ -33,6 +33,7 @@
+         active_cores: u32,
+         variant: &crate::g17::fw::Variant,
+     ) -> Result {
++        self.v27_2 = variant.data_27_2;
+         self.status_a = v::private::STATUS_A;
+         self.status_b = v::private::STATUS_B;
+         self.map_register_windows(env, cfg.windows)?;
+@@ -44,6 +45,9 @@
+         let objects = self.build_25g83_objects(env, variant.split_firmware_area)?;
+         self.views = Some(objects.views);
+         self.initialize_25g83(env, cfg, active_cores, &tables, &bundle, &objects, variant)?;
++        if variant.data_27_2 {
++            abi::v27_2::set_kick_dependency_high(abi::v27_2::KICK_DEPENDENCY_HIGH);
++        }
+         if cfg.uat_quirks.clean_tables {
+             // Write back every host-built byte before the firmware may read it.
+             for object in self.objects.iter_mut() {
+@@ -163,12 +167,41 @@
+                 }
+                 Ok(())
+             })?;
++        if variant.data_27_2 {
++            use mmu::PROT_FW_SHARED_RW as FS;
++            let extra = self.add(env.dynamic(
++                mmu::UAT_PGSZ,
++                mmu::UAT_PGSZ as u64,
++                FS,
++                CpuMap::WriteCombined,
++            )?)?;
++            let extra_va = self.object(extra)?.gpu_va();
++            let bytes = self.object_mut(self.bundle)?.bytes_mut();
++            abi::v27_2::hw_data(
++                bytes.get_mut(..abi::v27_2::HW_DATA_25G83).ok_or(EINVAL)?,
++                env.clusters as usize,
++                extra_va,
++            )?;
++            abi::v27_2::power_config(
++                bytes
++                    .get_mut(v::POWER_CONFIG..v::POWER_CONFIG + abi::v27_2::POWER_CONFIG_25G83)
++                    .ok_or(EINVAL)?,
++            )?;
++        }
+         self.object_mut(self.region_c)?
+             .initialize::<abi::RegionC>(0, |region| {
+                 region.init(cfg.region_c()?);
+                 region.max_power_mw = max_power_mw;
+                 Ok(())
+             })?;
++        if variant.data_27_2 {
++            abi::v27_2::region_c(
++                self.object_mut(self.region_c)?
++                    .bytes_mut()
++                    .get_mut(..abi::v27_2::REGION_C)
++                    .ok_or(EINVAL)?,
++            )?;
++        }
+         for (index, word) in aon_table.iter().enumerate() {
+             self.object_mut(objects.aon)?.write(index * 4, *word)?;
+         }
+@@ -180,13 +213,20 @@
+             .write(v::private::STATUS_B, abi::StatusBlock::new())?;
+         // Status B keeps the A18 Pro's field offsets up to its recovery words.
+         let fwctl_va = self.object(tables.fwctl)?.gpu_va();
+-        let fwctl =
+-            v::private::STATUS_B + core::mem::offset_of!(abi::PrimaryStatusB, fwctl_state_va);
++        let fwctl = v::private::STATUS_B
++            + core::mem::offset_of!(abi::PrimaryStatusB, fwctl_state_va)
++            + if variant.data_27_2 { abi::v27_2::STATUS_B_SHIFT } else { 0 };
+         let cluster = self.object(self.cluster)?;
+         cluster.dword(fwctl)?.store(fwctl_va, Ordering::Relaxed);
+         cluster
+             .dword(fwctl + 8)?
+             .store(fwctl_va + abi::FWCTL_RING, Ordering::Relaxed);
++        if variant.data_27_2 {
++            // macOS 27.2 sets this from the start (A18 Pro's unk_e434, moved +0x2e0).
++            cluster
++                .word(v::private::STATUS_B + abi::v27_2::STATUS_B_E714)?
++                .store(1, Ordering::Relaxed);
++        }
+ 
+         // One main configuration carrying both roles.
+         let main_offset = abi::bundle::MAIN_CONFIG[Role::Primary as usize];
+@@ -215,12 +255,26 @@
+                 main.power_config_va = bundle_va + v::POWER_CONFIG as u64;
+                 main.unk_32c = 0;
+                 main.unk_344 = 0;
++                if variant.main_config_27_2 {
++                    // 27.2: the power configuration pointer moved 0x10 up, macOS leaves
++                    // +0x18 zero and sets these words (meaning unknown).
++                    let power_config_va = main.power_config_va;
++                    main.power_config_va = 0;
++                    main.unk_479[8..16].copy_from_slice(&power_config_va.to_le_bytes());
++                    main.unk_18 = [0; 8];
++                    for (offset, value) in [(0x308, 4u32), (0x30c, 100), (0x320, 1), (0x324, 2), (0x328, 3)] {
++                        let at = offset - 0x304;
++                        main.unk_304[at..at + 4].copy_from_slice(&value.to_le_bytes());
++                    }
++                }
+                 Ok(())
+             })?;
+         if variant.opening_record {
++            let mut opening = abi::OpeningRecord::new(abi::Role::Primary);
++            opening.opcode = variant.opening_opcode;
+             self.object_mut(self.bundle)?.write(
+                 main_offset + abi::MainConfig::CONTROL_RING,
+-                abi::OpeningRecord::new(abi::Role::Primary),
++                opening,
+             )?;
+         }
+ 
+@@ -233,16 +287,22 @@
+             ias: cfg.uat_ias,
+             oas: cfg.uat_oas,
+         };
+-        self.object_mut(self.roots)?.write(
+-            0,
+-            abi::SecondaryRoot::merged(&root, status_b_va, power_state_va, config_va),
+-        )?;
++        let mut merged = abi::SecondaryRoot::merged(&root, status_b_va, power_state_va, config_va);
++        merged.root.version = variant.interface_version;
++        self.object_mut(self.roots)?.write(0, merged)?;
+         for &(offset, value, repeat) in v::POWER_STATE_WORDS {
+             for index in 0..repeat {
+                 self.object_mut(objects.power_state)?
+                     .write(offset + 4 * index, value)?;
+             }
+         }
++        if variant.data_27_2 {
++            let state = self.object_mut(objects.power_state)?;
++            for (offset, value) in abi::v27_2::POWER_STATE_WORDS {
++                state.write(offset, value)?;
++            }
++            state.write(abi::v27_2::POWER_STATE_MAX_POWER, max_power_mw)?;
++        }
+ 
+         let producer = match variant.opening_record {
+             true => abi::OPENING_PRODUCER,
+--- a/drivers/gpu/drm/asahi/g17/initdata.rs
++++ b/drivers/gpu/drm/asahi/g17/initdata.rs
+@@ -205,6 +205,8 @@
+     status_b: usize,
+     /// Separately allocated views; `None` when they are packed into the bundle.
+     views: Option<[usize; 5]>,
++    /// The macOS 27.2 firmware (j614s patch): its device-control rules and Region C offsets.
++    v27_2: bool,
+     compute_shared: Option<ComputeShared>,
+     compute_scheduler: Option<ComputeScheduler>,
+     compute_active: core::cell::Cell<bool>,
+@@ -313,6 +315,7 @@
+             status_a: abi::private::PRIMARY_STATUS_A,
+             status_b: abi::private::STATUS_B,
+             views: None,
++            v27_2: false,
+             compute_shared: None,
+             compute_scheduler: None,
+             compute_active: core::cell::Cell::new(false),
+@@ -479,15 +482,51 @@
+         let mut record = super::fw::channels::SchedulerStateRelease::new(page_va, id);
+         if self.m5 {
+             record.opcode = super::fw::m5::queue::SCHEDULER_RELEASE_OPCODE;
++        } else if self.v27_2 {
++            // 27.2's 0x14 stores through the record's +4 as an address.
++            record.opcode = super::fw::channels::DeviceControlOp::M5SchedulerStateRelease as u32;
+         }
+         record
+     }
+ 
++    /// Whether the running firmware is the 27.2 build (j614s patch).
++    pub(super) fn is_v27_2(&self) -> bool {
++        self.v27_2
++    }
++
++    /// 27.2: writes the host idle timestamp pair that a 0x22 record makes the firmware copy:
++    /// the system counter now, then the power period (8 ms in 24 MHz clocks), as macOS does.
++    pub(super) fn write_idle_timestamp(&self) -> Result {
++        let now: u64;
++        // SAFETY: Reading the virtual counter has no side effects.
++        unsafe { core::arch::asm!("mrs {}, cntvct_el0", out(reg) now, options(nomem, nostack)) };
++        let region = self.object(self.region_c)?;
++        let at = super::fw::initdata::v27_2::REGION_C_IDLE_TIMESTAMP;
++        for (index, word) in [now as u32, (now >> 32) as u32, 200_000, 0].into_iter().enumerate() {
++            region.word(at + 4 * index)?.store(word, Ordering::Relaxed);
++        }
++        fence(Ordering::SeqCst);
++        Ok(())
++    }
++
++    /// How far status B's recovery and firmware-control words moved in the running firmware.
++    fn status_b_shift(&self) -> usize {
++        if self.v27_2 { super::fw::initdata::v27_2::STATUS_B_SHIFT } else { 0 }
++    }
++
++    /// How far the 25G83 Region C fields from +0x34 moved in the running firmware's layout.
++    fn region_c_shift(&self) -> usize {
++        if self.v27_2 { super::fw::initdata::v27_2::REGION_C_SHIFT } else { 0 }
++    }
++
+     /// Whether a control record of `opcode` holds the GPU powered until the firmware drains
+     /// it, by the family's rule.
+     pub(super) fn control_asserts_gpu_power(&self, opcode: super::fw::channels::DeviceControlOp) -> bool {
+         if self.m5 {
+             super::fw::m5::power::asserts_gpu_power(opcode as u32)
++        } else if self.v27_2 {
++            use super::fw::channels::DeviceControlOp as Op;
++            matches!(opcode, Op::TvbGrowReply | Op::ChannelErrorAck | Op::IdlePowerOff | Op::ContextKill)
+         } else {
+             opcode.asserts_gpu_power()
+         }
+@@ -1679,7 +1718,7 @@
+         let region = self.object(self.region_c)?;
+         let (effort_offset, override_offset) = if self.m5 {
+             (super::fw::m5::power::EFFORT, super::fw::m5::power::EFFORT_OVERRIDE)
+-        } else { (abi::RegionC::EFFORT, abi::RegionC::UNK_E8) };
++        } else { (abi::RegionC::EFFORT + self.region_c_shift(), abi::RegionC::UNK_E8 + self.region_c_shift()) };
+         let override_word = region.word(override_offset)?;
+         let effort_word = region.word(effort_offset)?;
+         let line = region.pointer(effort_offset, 4)?;
+@@ -1697,7 +1736,7 @@
+     pub(super) fn effort(&self) -> Result<u32> {
+         Ok(self
+             .object(self.region_c)?
+-            .word(if self.m5 { super::fw::m5::power::EFFORT } else { abi::RegionC::EFFORT })?
++            .word(if self.m5 { super::fw::m5::power::EFFORT } else { abi::RegionC::EFFORT + self.region_c_shift() })?
+             .load(Ordering::Relaxed))
+     }
+ 
+@@ -1877,7 +1916,7 @@
+         let power = self
+             .object(self.region_c)?
+             .pointer(if self.m5 { self.graph.power_assert_tally }
+-                else { abi::RegionC::POWER_ASSERT_TALLY }, 4)?;
++                else { abi::RegionC::POWER_ASSERT_TALLY + self.region_c_shift() }, 4)?;
+         let producer = self.control_producer()?;
+         // SAFETY: The checked pointers remain valid for the lifetime of this non-Sync owner.
+         // Firmware only reads records after the producer store and the device mutex serializes
+@@ -1935,7 +1974,7 @@
+         if self.m5 {
+             self.graph.private.status_b
+                 + super::fw::m5::initdata::M5_RECOVERY_STATE
+-        } else { self.status_b + abi::PrimaryStatusB::RECOVERY_STATE }
++        } else { self.status_b + abi::PrimaryStatusB::RECOVERY_STATE + self.status_b_shift() }
+     }
+ 
+     /// Validate the serialized view before reading its retained host mapping.
+@@ -1982,7 +2021,7 @@
+             self.graph.private.status_b
+                 + super::fw::m5::initdata::M5_RECOVERY_SLOT_MASK
+         } else {
+-            self.status_b + abi::PrimaryStatusB::RECOVERY_SLOT_MASK
++            self.status_b + abi::PrimaryStatusB::RECOVERY_SLOT_MASK + self.status_b_shift()
+         };
+         let mask = self
+             .object(self.cluster)?
+@@ -2030,7 +2069,7 @@
+                 self.graph.private.status_b
+                     + super::fw::m5::initdata::M5_HOST_RECOVERY
+             } else {
+-                self.status_b + abi::PrimaryStatusB::HOST_RECOVERY
++                self.status_b + abi::PrimaryStatusB::HOST_RECOVERY + self.status_b_shift()
+             })?
+             .load(Ordering::Relaxed))
+     }
+@@ -2087,7 +2126,7 @@
+             self.graph.private.status_b
+                 + super::fw::m5::initdata::M5_RECOVERY_INFO
+         } else {
+-            self.status_b + abi::PrimaryStatusB::RECOVERY_INFO
++            self.status_b + abi::PrimaryStatusB::RECOVERY_INFO + self.status_b_shift()
+         };
+         let offset = base + index * core::mem::size_of::<abi::RecoveryInfoEntry>();
+         fence(Ordering::Acquire);
+--- a/drivers/gpu/drm/asahi/g17/mod.rs
++++ b/drivers/gpu/drm/asahi/g17/mod.rs
+@@ -1105,6 +1105,11 @@
+     }
+     fn set_idle(&mut self, enabled: bool) -> Result<u32> {
+         use fw::channels::{ControlRecord, IdlePolicy, IdlePowerOff};
++        if !enabled && self.init.is_v27_2() {
++            // macOS 27.2 refreshes the host idle timestamp ahead of its work.
++            self.init.write_idle_timestamp()?;
++            self.publish_control(&ControlRecord::IdleTimestamp(fw::channels::IdleTimestamp::new()))?;
++        }
+         self.publish_control(&ControlRecord::IdlePowerOff(IdlePowerOff::new(
+             if enabled {
+                 IdlePolicy::AllowPowerOff
+--- a/drivers/gpu/drm/asahi/g17/queue/compute.rs
++++ b/drivers/gpu/drm/asahi/g17/queue/compute.rs
+@@ -135,6 +135,8 @@
+ /// `ring` is `None` while the queue is vacant (idle, no owner, pool given back).
+ struct Graph {
+     m5: bool,
++    /// The queue record has the 0x80-byte M5 layout (M5, or the 27.2 firmware).
++    m5_record: bool,
+     ring: Option<DescriptorRing>,
+     preempt: KernelObject,
+     usage: KernelObject,
+@@ -170,7 +172,9 @@
+         board: Option<&'static Board>,
+         program: ComputeProgram,
+         m5: bool,
++        m5_record: bool,
+     ) -> Result<Self> {
++        let m5_record = m5 || m5_record;
+         let page = mmu::UAT_PGSZ as u64;
+         let prot = mmu::PROT_GPU_FW_SHARED_RW;
+         let cpu = CpuMap::WriteCombined;
+@@ -216,7 +220,7 @@
+         };
+         // One queue record, the firmware's own: the M5 record is shorter than the G17P one the
+         // layout's slot holds, and the zeroed layout leaves the rest of the slot zero.
+-        if m5 {
++        if m5_record {
+             graph.write(0, crate::g17::fw::m5::queue::QueueRecord::new(&record)?)?;
+         } else {
+             graph.write(0, QueueRecord::new(&record))?;
+@@ -239,6 +243,7 @@
+         )?;
+         Ok(Self {
+             m5,
++            m5_record,
+             ring: Some(ring),
+             preempt,
+             usage,
+@@ -298,7 +303,7 @@
+ 
+     /// Caller has excluded publication and proved the retained graph idle.
+     fn set_owner(&mut self, context: &Context) -> Result {
+-        if self.m5 {
++        if self.m5_record {
+             let pointer = self.graph.pointer(0,
+                 core::mem::size_of::<crate::g17::fw::m5::queue::QueueRecord>())?
+                 .cast::<crate::g17::fw::m5::queue::QueueRecord>();
+@@ -707,10 +712,11 @@
+         board: Option<&'static Board>,
+         program: ComputeProgram,
+         m5: bool,
++        m5_record: bool,
+     ) -> Result<Self> {
+         let Backing { mut pool, mut kick } = backing;
+         let (active, replays) = (Fifo::new()?, Fifo::new()?);
+-        let mut graph = Graph::new(alloc, objects, &context, pointers, operand_state, board, program, m5)?;
++        let mut graph = Graph::new(alloc, objects, &context, pointers, operand_state, board, program, m5, m5_record)?;
+         let kick_alias = kick.map_client(context.vm())?;
+         let pool_alias = pool.map_client(context.vm())?;
+         let binding = graph.bind(context.clone(), kick_alias, pool_alias)?;
+--- a/drivers/gpu/drm/asahi/g17/queue/render/memory.rs
++++ b/drivers/gpu/drm/asahi/g17/queue/render/memory.rs
+@@ -105,9 +105,15 @@
+     /// Host words of the pointer blocks in this firmware build.
+     pub(super) pointers: fw::variant::PointerLayout,
+     m5: bool,
++    /// [`fw::Variant::queues_27_2`]: 0x80-byte queue records and a configuration with every kick.
++    queues_27_2: bool,
+ }
+ impl Graph {
+     pub(super) fn is_m5(&self) -> bool { self.m5 }
++    /// Whether this graph has the 27.2 queues ([`fw::Variant::queues_27_2`]).
++    pub(super) fn queues_27_2(&self) -> bool { self.queues_27_2 }
++    /// Whether the queue records have the 0x80-byte M5 layout.
++    fn m5_records(&self) -> bool { self.m5 || self.queues_27_2 }
+ 
+     /// Out of line: inlined, its temporaries stay reserved in `Memory::new`'s frame while the
+     /// rest of the pair (`buffer::Manager::new` and its allocations) is built below it, which
+@@ -119,6 +125,7 @@
+         context: &Context,
+         qids: [u8; 2],
+         pointers: fw::variant::PointerLayout,
++        queues_27_2: bool,
+     ) -> Result<Self> {
+         let prot = mmu::PROT_GPU_FW_SHARED_RW;
+         let m5 = alloc.uat.is_m5();
+@@ -177,7 +184,7 @@
+                 owner_pid: context.owner_pid(),
+                 policy: context.policy(),
+             };
+-            if m5 {
++            if m5 || queues_27_2 {
+                 queues.write(qids[stage] as usize * size_of::<fw::m5::queue::QueueRecord>(),
+                     fw::m5::queue::QueueRecord::new(&args)?)?;
+             } else {
+@@ -201,10 +208,11 @@
+             owners: [None; RECORDS],
+             pointers,
+             m5,
++            queues_27_2,
+         })
+     }
+     pub(super) fn queue_offset(&self, qid: u8) -> usize {
+-        usize::from(qid) * if self.m5 { size_of::<fw::m5::queue::QueueRecord>() }
++        usize::from(qid) * if self.m5_records() { size_of::<fw::m5::queue::QueueRecord>() }
+             else { size_of::<queue::QueueRecord>() }
+     }
+     pub(super) fn queue_va(&self, qid: u8) -> u64 {
+@@ -554,7 +562,7 @@
+         let vm = context.vm();
+         let m5 = alloc.uat.is_m5();
+         if m5 != layout.is_m5() { return Err(EINVAL); }
+-        let mut graph = Graph::new(alloc, pool, &context, qids, variant.pointers)?;
++        let mut graph = Graph::new(alloc, pool, &context, qids, variant.pointers, variant.queues_27_2)?;
+         let mut target = target::Target::new(alloc.dev, vm, layout)?;
+         target.prepare(ordinal, layout)?;
+         let state = Generation::allocate_state(alloc, vm, board)?;
+@@ -995,14 +1003,18 @@
+         if self.graph.m5 {
+             return fw::m5::render_assembly::bind_work_slot(self.graph.m5_storage(ordinal)?, slot);
+         }
+-        let queues = [
+-            self.graph
+-                .queues
+-                .word(usize::from(qids[1]) * size_of::<queue::QueueRecord>() + 0x38)?,
+-            self.graph
+-                .queues
+-                .word(usize::from(qids[0]) * size_of::<queue::QueueRecord>() + 0x38)?,
+-        ];
++        // The 27.2 (M5) record's +0x38 is a scheduling word, not the work slot.
++        let queues = match self.graph.queues_27_2 {
++            true => None,
++            false => Some([
++                self.graph
++                    .queues
++                    .word(usize::from(qids[1]) * size_of::<queue::QueueRecord>() + 0x38)?,
++                self.graph
++                    .queues
++                    .word(usize::from(qids[0]) * size_of::<queue::QueueRecord>() + 0x38)?,
++            ]),
++        };
+         let ta = self
+             .graph
+             .descriptors
+@@ -1013,7 +1025,7 @@
+             .descriptors
+             .pointer(self.graph.offset(1, ordinal), size_of::<abi::FragmentSlot>())?
+             .cast::<abi::FragmentSlot>();
+-        for word in queues {
++        for word in queues.into_iter().flatten() {
+             word.store(slot, Ordering::Relaxed);
+         }
+         // SAFETY: The generation owns these prepared, unpublished POD views.
+@@ -1034,7 +1046,7 @@
+     /// would also store back firmware-owned words of a possibly running queue,
+     /// is skipped. G17P always retargets.
+     pub(super) fn set_owner(&self, qids: [u8; 2], context: &Context, rewrite: bool) -> Result {
+-        if self.graph.m5 {
++        if self.graph.m5_records() {
+             let records = qids.map(|qid| self.graph.queues.pointer(self.graph.queue_offset(qid),
+                 size_of::<fw::m5::queue::QueueRecord>()));
+             let [first, second] = records;
+--- a/drivers/gpu/drm/asahi/g17/queue/render.rs
++++ b/drivers/gpu/drm/asahi/g17/queue/render.rs
+@@ -916,7 +916,7 @@
+             // macOS 27.0 sends a configuration with every J813 kick, so the firmware always
+             // runs a kick under the context its own record names; leaving it out let a fragment
+             // run under another client's (or no) context under parallel load.
+-            j813 || publication::required(cache[stage], config)
++            j813 || self.memory.graph.queues_27_2() || publication::required(cache[stage], config)
+         });
+         // An idle pair's next command starts from the rings' cursors; behind a command in
+         // flight it starts from that command's windows, and only the producers are checked.
+--- a/drivers/gpu/drm/asahi/g17/runtime.rs
++++ b/drivers/gpu/drm/asahi/g17/runtime.rs
+@@ -1292,6 +1292,7 @@
+                     self.shared.m5_board,
+                     self.shared.variant.compute,
+                     alloc.uat.is_m5(),
++                    self.shared.variant.queues_27_2,
+                 )?;
+                 Ok(KBox::new(queue, GFP_KERNEL)?)
+             })();
+--- a/drivers/gpu/drm/asahi/hw/t6040.rs
++++ b/drivers/gpu/drm/asahi/hw/t6040.rs
+@@ -108,6 +108,26 @@
+         ],
+         variant: &fw::variant::V25G83,
+         config: None,
++    },
++    fw::variant::Build {
++        os_version: [27, 2, 0],
++        name: "macOS 27.2 (j614s patch: 27.2 firmware under the 25G83 interface)",
++        images: &[crate::fwid::FirmwareBuild {
++            name: "Apple GFX 27.2 for T6040 (loaded image)",
++            // __TEXT and __DATA; the third segment, __DATA_SHARED_RO (0x8000), is its own
++            // region (gfx-data-shared-ro) that iBoot maps and aura reserves.
++            text_size: 0x64000,
++            data_size: 0xc4000,
++            entropy: &[[0x5d88c, 0x5d96f]],
++            boot_filled: &[],
++            text_sha256: [
++                0xed, 0xa5, 0x3a, 0x91, 0xe2, 0x77, 0xd1, 0x18, 0xd9, 0xc2, 0xdd, 0x4f, 0x15,
++                0x6f, 0x3c, 0x5b, 0x24, 0xa6, 0x7b, 0x42, 0xe5, 0x15, 0xda, 0xef, 0x53, 0x75,
++                0xfe, 0xb0, 0xf1, 0xe8, 0x23, 0x8d,
++            ],
++        }],
++        variant: &fw::variant::V27_2,
++        config: None,
+     }]),
+     // Measured on the 20-core M4 Pro; the alternative below remains experimental.
+     core_layout: CoreLayout {
