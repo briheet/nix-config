@@ -1,0 +1,112 @@
+j614s bring-up: firmware log on (main configuration +0x250) and printed on a
+render timeout ("j614s-fwlog"); Region C +0x9dc = 50, +0xe0c = 250 and
+unk_78 as 25G83 (macOS 27.2 at its InitData message).
+
+--- a/drivers/gpu/drm/asahi/g17/fw/initdata/v27_2.rs
++++ b/drivers/gpu/drm/asahi/g17/fw/initdata/v27_2.rs
+@@ -292,9 +292,66 @@
+         &[run(0, 0x34, 0), run(0x34, REGION_C - REGION_C_SHIFT, 0x34 + REGION_C_SHIFT)],
+     )?;
+     put(block, 0x34, &1u32.to_le_bytes())?;
+-    // 25G83 unk_78 (T6040: 1, 0, 0).
+-    for (i, value) in [1u32, 2, 902].into_iter().enumerate() {
+-        put(block, 0x7c + 4 * i, &value.to_le_bytes())?;
++    // macOS 27.2's words at its InitData message that 25G83 leaves zero.
++    for (at, value) in [(0x9dcusize, 50u32), (0xe0c, 250)] {
++        put(block, at, &value.to_le_bytes())?;
+     }
+     Ok(())
+ }
++
++/// j614s bring-up: the firmware log is enabled (main configuration +0x250) and its messages are
++/// printed when a render times out.
++pub(crate) const FW_LOG_ENABLE: bool = true;
++/// The log messages in status A: 9 rings of 256 messages of 0xd8 bytes.
++pub(crate) const FW_LOG_MESSAGES: usize = 0x2d2c0;
++pub(crate) const FW_LOG_BYTES: usize = 9 * 256 * FW_LOG_MESSAGE;
++const FW_LOG_MESSAGE: usize = 0xd8;
++static FW_LOG: core::sync::atomic::AtomicPtr<u8> =
++    core::sync::atomic::AtomicPtr::new(core::ptr::null_mut());
++
++/// Remembers where the firmware writes its log messages (`FW_LOG_BYTES` at `messages`, a
++/// kernel mapping that lives as long as the device).
++pub(crate) fn set_fw_log(messages: *mut u8) {
++    FW_LOG.store(messages, core::sync::atomic::Ordering::Release);
++}
++
++/// Prints the firmware's log messages (bring-up).
++pub(crate) fn dump_fw_log() {
++    let base = FW_LOG.load(core::sync::atomic::Ordering::Acquire);
++    if base.is_null() {
++        return;
++    }
++    let mut printed = 0;
++    for index in 0..FW_LOG_BYTES / FW_LOG_MESSAGE {
++        // SAFETY: set_fw_log() named FW_LOG_BYTES of a live mapping; the firmware may be writing
++        // a message while it is copied, which only garbles that message.
++        let mut message = [0u8; FW_LOG_MESSAGE];
++        unsafe {
++            core::ptr::copy_nonoverlapping(base.add(index * FW_LOG_MESSAGE), message.as_mut_ptr(), FW_LOG_MESSAGE)
++        };
++        if message.iter().all(|&b| b == 0) {
++            continue;
++        }
++        let mut text = [b' '; FW_LOG_MESSAGE - 0x10];
++        let mut len = 0;
++        for &b in &message[0x10..] {
++            if b == 0 {
++                break;
++            }
++            text[len] = if (0x20..0x7f).contains(&b) { b } else { b'.' };
++            len += 1;
++        }
++        let text = core::str::from_utf8(&text[..len]).unwrap_or("?");
++        pr_warn!(
++            "j614s-fwlog {:4} {} {}\n",
++            index,
++            crate::fwid::Hex(&message[..0x10]),
++            text
++        );
++        printed += 1;
++        if printed >= 400 {
++            break;
++        }
++    }
++    pr_warn!("j614s-fwlog: {} messages\n", printed);
++}
+--- a/drivers/gpu/drm/asahi/g17/initdata/v25g83.rs
++++ b/drivers/gpu/drm/asahi/g17/initdata/v25g83.rs
+@@ -45,6 +45,13 @@
+         let objects = self.build_25g83_objects(env, variant.split_firmware_area)?;
+         self.views = Some(objects.views);
+         self.initialize_25g83(env, cfg, active_cores, &tables, &bundle, &objects, variant)?;
++        if variant.data_27_2 && abi::v27_2::FW_LOG_ENABLE {
++            let messages = self.object(self.cluster)?.pointer(
++                v::private::STATUS_A + abi::v27_2::FW_LOG_MESSAGES,
++                abi::v27_2::FW_LOG_BYTES,
++            )?;
++            abi::v27_2::set_fw_log(messages);
++        }
+         if variant.main_config_27_2 {
+             // j614s bring-up: the 25G83 blocks as built, for comparison with macOS 27.2's.
+             let dev = env.dev.as_ref().as_ref();
+@@ -263,6 +270,9 @@
+                     main.power_config_va = 0;
+                     main.unk_479[8..16].copy_from_slice(&power_config_va.to_le_bytes());
+                     main.unk_18 = [0; 8];
++                    if abi::v27_2::FW_LOG_ENABLE {
++                        main.log_enable = 1;
++                    }
+                     for (offset, value) in [(0x308, 4u32), (0x30c, 100), (0x320, 1), (0x324, 2), (0x328, 3)] {
+                         let at = offset - 0x304;
+                         main.unk_304[at..at + 4].copy_from_slice(&value.to_le_bytes());
+--- a/drivers/gpu/drm/asahi/g17/queue/render.rs
++++ b/drivers/gpu/drm/asahi/g17/queue/render.rs
+@@ -1651,6 +1651,7 @@
+             snapshot.cursors[1],
+             if snapshot.job_list_empty { "empty" } else { "not empty" }
+         );
++        crate::g17::fw::initdata::v27_2::dump_fw_log();
+     }
+ 
+     fn selected(&self, masks: Option<[u64; 2]>) -> bool {
