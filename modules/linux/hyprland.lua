@@ -86,6 +86,8 @@ local mod = "SUPER"
 -- terminal opens in it at once (modules/linux/ghostty.nix).
 hl.on("hyprland.start", function()
     hl.exec_cmd(terminal .. " --initial-window=false")
+    -- The wallpaper (~/.config/hypr/hyprpaper.conf, modules/linux/hyprland.nix).
+    hl.exec_cmd("hyprpaper")
 end)
 
 hl.bind(mod .. " + Return", hl.dsp.exec_cmd(terminal))
