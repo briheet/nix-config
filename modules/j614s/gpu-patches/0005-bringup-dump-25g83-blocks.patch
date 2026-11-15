@@ -1,0 +1,35 @@
+j614s bring-up only: log the 25G83 HwData, PowerConfig and power state as
+built (nonzero 32-byte rows, "j614s-dump"), to compare with macOS 27.2.
+
+--- a/drivers/gpu/drm/asahi/g17/initdata/v25g83.rs
++++ b/drivers/gpu/drm/asahi/g17/initdata/v25g83.rs
+@@ -44,6 +44,15 @@
+         let objects = self.build_25g83_objects(env, variant.split_firmware_area)?;
+         self.views = Some(objects.views);
+         self.initialize_25g83(env, cfg, active_cores, &tables, &bundle, &objects, variant)?;
++        if variant.main_config_27_2 {
++            // j614s bring-up: the 25G83 blocks as built, for comparison with macOS 27.2's.
++            let dev = env.dev.as_ref().as_ref();
++            let bytes = self.object_mut(self.bundle)?.bytes_mut();
++            dump(dev, "hw", &bytes[..0x3db4]);
++            dump(dev, "pc", &bytes[v::POWER_CONFIG..v::POWER_CONFIG + 0x6510]);
++            let state = self.object_mut(objects.power_state)?.bytes_mut();
++            dump(dev, "ps", &state[..0x6a8]);
++        }
+         if cfg.uat_quirks.clean_tables {
+             // Write back every host-built byte before the firmware may read it.
+             for object in self.objects.iter_mut() {
+@@ -270,3 +279,13 @@
+         Ok(())
+     }
+ }
++
++/// Logs the nonzero 32-byte rows of `bytes` (j614s bring-up).
++fn dump(dev: &kernel::device::Device, tag: &str, bytes: &[u8]) {
++    for (row, chunk) in bytes.chunks(32).enumerate() {
++        if chunk.iter().all(|&b| b == 0) {
++            continue;
++        }
++        kernel::dev_info!(dev, "j614s-dump {} {:05x} {}\n", tag, row * 32, crate::fwid::Hex(chunk));
++    }
++}
