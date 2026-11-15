@@ -17,6 +17,7 @@
     ../../modules/common/zoxide.nix
     ../../modules/linux/hyprland.nix
     ../../modules/linux/fuzzel.nix
+    ../../modules/linux/zen-browser.nix
   ];
 
   home = {

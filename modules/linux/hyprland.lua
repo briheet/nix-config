@@ -20,7 +20,7 @@ hl.monitor({
 ---- Programs ----
 local terminal = "ghostty"
 local menu     = "fuzzel"
-local browser  = "firefox"
+local browser  = "zen-twilight"
 
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
