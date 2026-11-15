@@ -104,5 +104,11 @@
     openssh.authorizedKeys.keyFiles = [
       ../hetzner/secrets.txt
     ];
+    # The coding agent on goryutenmetsu (its own key, ~/.ssh/kyokasuigetsu_agent
+    # there): a shell and commands only, no forwarding. Remove this line to
+    # revoke it.
+    openssh.authorizedKeys.keys = [
+      "no-agent-forwarding,no-port-forwarding,no-X11-forwarding ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOhW4/JQxlvfCqz7jM3BasRdumUmievwDVU8NeXlyJMX claude-agent@goryutenmetsu"
+    ];
   };
 }
