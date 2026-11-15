@@ -1,0 +1,77 @@
+kboot: J614s AOP on 27.2: keep the firmware's __EDATA mapping
+
+The macOS 27.2 AOP firmware (mac16jaop) runs a fifth segment from DRAM:
+__EDATA, 8 KiB of initialized data that iBoot leaves at a physical page
+and that the firmware reaches at IOVA 0x10000020000, inside its external
+code window after __ETEXT (0x10000000000, the firmware's EC0p). The J614s
+handoff kept only __ETEXT and __OS_LOG and deleted every other region's
+iommu-addresses, so the started firmware faulted before its RTKit HELLO
+and Linux logged "RTKit: endpoint discovery failed: -62". That leaves the
+AOP down and with it the headphone jack, speakers, microphones and the
+ambient light sensor.
+
+Keep at most one region inside the 16 MiB EC0p window as well, mapped
+where the firmware expects it. The kernel side (../aop-patches) accepts
+that region. Layouts without __EDATA are unchanged.
+
+diff --git a/src/kboot.c b/src/kboot.c
+index 642480b..1109ae2 100644
+--- a/src/kboot.c
++++ b/src/kboot.c
+@@ -11531,12 +11531,15 @@ static int dt_finish_j614s_isp(bool ready)
+     return 0;
+ }
+ 
++/* The AOP firmware's external code and data window at IOVA 0x10000000000 (its EC0p). */
++#define J614S_AOP_EXT_WINDOW 0x1000000ULL
++
+ /* J614s AOP handoff. Run only after the DAPF result is known. */
+ static int dt_finish_j614s_aop(void *tree, bool ready)
+ {
+-    fdt32_t keep[2];
++    fdt32_t keep[3];
+     u32 remove[8], handles[8];
+-    int len, count, code = 0, log = 0, nkeep = 0, nremove = 0;
++    int len, count, code = 0, log = 0, ext = 0, nkeep = 0, nremove = 0;
+     int aop = fdt_node_offset_by_compatible(tree, -1, "apple,t6041-aop");
+     const fdt32_t *refs;
+ 
+@@ -11568,25 +11571,34 @@ static int dt_finish_j614s_aop(void *tree, bool ready)
+         if (!size || size != span || (phys & 0x3fff) || (size & 0x3fff) || (iova & 0x3fff) ||
+             phys > UINT64_MAX - size || iova > UINT64_MAX - size)
+             return -1;
+-        if (iova != 0x10000000000ULL && iova != phys) {
++        /*
++         * The 27.2 firmware also runs initialized data from DRAM (__EDATA), remapped inside the
++         * external-code window after __ETEXT (0x10000020000). Keep it mapped there.
++         */
++        bool edata = iova > 0x10000000000ULL && iova < 0x10000000000ULL + J614S_AOP_EXT_WINDOW &&
++                     size <= J614S_AOP_EXT_WINDOW - (iova - 0x10000000000ULL);
++        if (iova != 0x10000000000ULL && iova != phys && !edata) {
+             remove[nremove++] = handles[i];
+             continue;
+         }
+-        if (nkeep == 2)
++        if (nkeep == (int)ARRAY_SIZE(keep))
+             return -1;
+         code += iova == 0x10000000000ULL;
+         log += iova == phys;
++        ext += edata;
+         keep[nkeep++] = cpu_to_fdt32(handles[i]);
+     }
+-    if (code != 1 || log != 1 || nkeep != 2)
++    if (code != 1 || log != 1 || ext > 1 || nkeep != 2 + ext)
+         return -1;
++    if (ext)
++        printf("FDT: J614s AOP: keeping its __EDATA mapping (27.2 layout)\n");
+     for (int i = 0; i < nremove; i++) {
+         int node = fdt_node_offset_by_phandle(tree, remove[i]);
+         if (node < 0 || fdt_delprop(tree, node, "iommu-addresses"))
+             return -1;
+     }
+     aop = fdt_node_offset_by_compatible(tree, -1, "apple,t6041-aop");
+-    if (aop < 0 || fdt_setprop(tree, aop, "memory-region", keep, sizeof(keep)))
++    if (aop < 0 || fdt_setprop(tree, aop, "memory-region", keep, nkeep * sizeof(keep[0])))
+         return -1;
+     aop = fdt_node_offset_by_compatible(tree, -1, "apple,t6041-aop");
+     refs = fdt_getprop(tree, aop, "iommus", &len);

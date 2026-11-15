@@ -1,0 +1,57 @@
+aop: T6040 on 27.2: accept the firmware's __EDATA region
+
+The macOS 27.2 AOP firmware also runs initialized data (__EDATA) from
+DRAM, which aura (aura-patches/0004) reserves and maps at the IOVA the
+firmware uses, inside the external code window that starts at EC0p
+(0x10000020000 on the J614s). check_fw_regions() accepted a region only
+at EC0p or at its physical address and refused the start. Accept one
+region inside the 16 MiB EC0p window too, checked for its mapping like
+the others.
+
+diff --git a/drivers/soc/apple/aop.rs b/drivers/soc/apple/aop.rs
+index 2347073..8058e3f 100644
+--- a/drivers/soc/apple/aop.rs
++++ b/drivers/soc/apple/aop.rs
+@@ -99,6 +99,8 @@ const BOOTARGS_SIZE: usize = 0x230;
+ const FW_REGION_MAX_SIZE: u64 = 0x10_0000;
+ /// The DART page size the firmware segments are mapped with.
+ const FW_REGION_PAGE: u64 = 0x4000;
++/// The external code and data window the firmware addresses from EC0p.
++const FW_EXT_WINDOW: u64 = 0x100_0000;
+ const AFK_ENDPOINT_START: u8 = 0x20;
+ const AFK_ENDPOINT_COUNT: u8 = 0xf;
+ const AFK_OPC_GET_BUF: u64 = 0x89;
+@@ -2009,6 +2011,7 @@ impl AopData {
+             return Err(ENODEV);
+         }
+         let mut etext = false;
++        let mut edata = false;
+         for idx in 0..count {
+             let (phys, iova, size) = Self::fw_region(np, idx).inspect_err(|e| {
+                 dev_err!(dev, "Invalid firmware memory-region {} ({:?})", idx, e);
+@@ -2023,12 +2026,25 @@ impl AopData {
+                 dev_err!(dev, "Invalid firmware memory-region {}", idx);
+                 return Err(EINVAL);
+             }
++            // The T6040 27.2 firmware also runs initialized data (__EDATA)
++            // from DRAM, remapped after its external code in the EC0p window.
++            let in_ext_window = ec0p != 0
++                && iova > ec0p
++                && iova - ec0p < FW_EXT_WINDOW
++                && size <= FW_EXT_WINDOW - (iova - ec0p);
+             if iova == ec0p {
+                 if etext {
+                     dev_err!(dev, "Two firmware memory-regions at EC0p {:#x}", ec0p);
+                     return Err(EINVAL);
+                 }
+                 etext = true;
++            } else if in_ext_window {
++                if edata {
++                    dev_err!(dev, "Two firmware data memory-regions in the EC0p window");
++                    return Err(EINVAL);
++                }
++                edata = true;
++                dev_info!(dev, "Firmware data memory-region at IOVA {:#x}", iova);
+             } else if iova != phys {
+                 dev_err!(
+                     dev,

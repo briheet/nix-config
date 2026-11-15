@@ -16,10 +16,10 @@
   boot.kernelPatches = map (name: { inherit name; patch = ./kernel-patches + "/${name}"; })
     (lib.sort lib.lessThan (lib.filter (lib.hasSuffix ".patch")
       (builtins.attrNames (builtins.readDir ./kernel-patches))));
-  # nixos-aurora's GPU and display drivers built on their own with
-  # ./gpu-patches (pkgs/aurora-gpu.nix) and ./display-patches
-  # (pkgs/aurora-display.nix), so driver work rebuilds only the module, not
-  # the kernel.
+  # nixos-aurora's GPU, display and AOP drivers built on their own with
+  # ./gpu-patches (pkgs/aurora-gpu.nix), ./display-patches
+  # (pkgs/aurora-display.nix) and ./aop-patches (pkgs/aurora-aop.nix), so
+  # driver work rebuilds only the module, not the kernel.
   boot.extraModulePackages =
     let
       patchesIn = dir: map (name: dir + "/${name}")
@@ -32,6 +32,9 @@
       })
       (config.boot.kernelPackages.callPackage ./pkgs/aurora-display.nix {
         patches = patchesIn ./display-patches;
+      })
+      (config.boot.kernelPackages.callPackage ./pkgs/aurora-aop.nix {
+        patches = patchesIn ./aop-patches;
       })
     ];
   # appledrm always loads: the GPU driver needs its symbols. It drives the
