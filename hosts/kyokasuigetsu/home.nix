@@ -18,6 +18,7 @@
     ../../modules/linux/hyprland.nix
     ../../modules/linux/fuzzel.nix
     ../../modules/linux/zen-browser.nix
+    ../../modules/linux/record-demo.nix
   ];
 
   home = {
