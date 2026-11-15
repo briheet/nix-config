@@ -14,7 +14,7 @@
       ipc = true;
       wallpaper = {
         monitor = "eDP-1";
-        path = "${pkgs.nixos-artwork.wallpapers.simple-dark-gray.gnomeFilePath}";
+        path = "${pkgs.nixos-artwork.wallpapers.nineish-dark-gray.gnomeFilePath}";
         fit_mode = "cover";
       };
     };
