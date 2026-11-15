@@ -16,6 +16,7 @@
     ../../modules/common/zellij.nix
     ../../modules/common/zoxide.nix
     ../../modules/linux/hyprland.nix
+    ../../modules/linux/fuzzel.nix
   ];
 
   home = {
