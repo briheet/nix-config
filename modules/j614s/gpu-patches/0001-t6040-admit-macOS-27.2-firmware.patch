@@ -1,0 +1,52 @@
+Admit the macOS 27.2 GPU firmware on T6040 (TEXT 0x64000, DATA 0xc4000;
+measured digest eda53a91...) with its own variant, V27_2, which starts as
+the 25G83 rules.
+
+--- a/drivers/gpu/drm/asahi/g17/fw/variant.rs
++++ b/drivers/gpu/drm/asahi/g17/fw/variant.rs
+@@ -173,6 +173,10 @@
+     registration_power_hold: true,
+ };
+ 
++/// The M4 Pro firmware of macOS 27.2 (j614s patch). Starts as the 25G83 rules; the layouts
++/// that differ in 27.2 are being moved here one by one (nixos-m4pro docs/gpu/driver-27.2-diff.md).
++pub(crate) const V27_2: Variant = Variant { ..V25G83 };
++
+ /// The 26A428 firmware of the M5 GPUs, which runs the M5 protocol (the M5 graph, queues and
+ /// command set).
+ pub(crate) const V26A428_M5: Variant = Variant {
+@@ -195,4 +199,5 @@
+     assert!(super::queue::PointerBlock::valid_layout(&V26A428.pointers));
+     assert!(super::queue::PointerBlock::valid_layout(&V25G83.pointers));
+     assert!(super::queue::PointerBlock::valid_layout(&V25F84.pointers));
++    assert!(super::queue::PointerBlock::valid_layout(&V27_2.pointers));
+ };
+--- a/drivers/gpu/drm/asahi/hw/t6040.rs
++++ b/drivers/gpu/drm/asahi/hw/t6040.rs
+@@ -108,6 +108,26 @@
+         ],
+         variant: &fw::variant::V25G83,
+         config: None,
++    },
++    fw::variant::Build {
++        os_version: [27, 2, 0],
++        name: "macOS 27.2 (j614s patch: 27.2 firmware under the 25G83 interface)",
++        images: &[crate::fwid::FirmwareBuild {
++            name: "Apple GFX 27.2 for T6040 (loaded image)",
++            // __TEXT and __DATA; the third segment, __DATA_SHARED_RO (0x8000), is its own
++            // region (gfx-data-shared-ro) that iBoot maps and aura reserves.
++            text_size: 0x64000,
++            data_size: 0xc4000,
++            entropy: &[[0x5d88c, 0x5d96f]],
++            boot_filled: &[],
++            text_sha256: [
++                0xed, 0xa5, 0x3a, 0x91, 0xe2, 0x77, 0xd1, 0x18, 0xd9, 0xc2, 0xdd, 0x4f, 0x15,
++                0x6f, 0x3c, 0x5b, 0x24, 0xa6, 0x7b, 0x42, 0xe5, 0x15, 0xda, 0xef, 0x53, 0x75,
++                0xfe, 0xb0, 0xf1, 0xe8, 0x23, 0x8d,
++            ],
++        }],
++        variant: &fw::variant::V27_2,
++        config: None,
+     }]),
+     // Measured on the 20-core M4 Pro; the alternative below remains experimental.
+     core_layout: CoreLayout {
