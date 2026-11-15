@@ -10,6 +10,8 @@ light sensor on the M4 Pro.
   __EDATA region, mapped inside its EC0p window, and pass its IOVA as the
   new ED0p boot argument (left 0, the firmware stalls before its mailbox).
   Needs ../aura-patches/0004, which keeps that mapping in the handoff.
-- 0002-aop-debug-dump-state-on-failed-start.patch: debug, while the AOP is
-  brought up on 27.2: on a failed start, log ("aopdbg") its ASC and mailbox
-  state, boot arguments, log text and SRAM fault strings.
+
+With both, the AOP starts on 27.2 ("AOP IS READY", 2026-11-15): the headphone
+jack card (MacBook Pro J614 Jack) and the AOP audio interface (HPAI) appear.
+The speakers stay disabled in the kernel's J614s tree until there is a J614
+speaker protection profile.
