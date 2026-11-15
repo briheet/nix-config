@@ -8,9 +8,58 @@ On that path, like the T6050: adopt the running session and open no DPTX
 port services on the panel processor; no firmware clock ids (the T6041
 device tree names none); the desktop shared-memory mapping (buffers in
 linear-mapped RAM, which memremap(WC) refuses); and log the coprocessor
-handoff state. t6041_fw27=0 refuses the 27.2 firmware instead.
-(github:briheet/nixos-m4pro docs/display/dcp-27.2-kernel.md)
+handoff state. 27.2 numbers its methods A402-A499 50 higher than 27.0 and
+A389/A390 one higher (the first run crashed the firmware with "callback not
+found: A427", 27.0's get_color_remap_mode, 27.2's A477): outgoing tags
+are renumbered at push time; the 27.0 table stays as it is for the T6050.
+t6041_fw27=0 refuses the 27.2 firmware instead.
+(github:briheet/nixos-m4pro docs/display/dcp-27.2-kernel.md, dcp-27.2-rpc.md)
 
+--- a/drivers/gpu/drm/apple/dcp-internal.h
++++ b/drivers/gpu/drm/apple/dcp-internal.h
+@@ -465,6 +465,12 @@
+ 
+ 	/* firmware version and compatible firmware version */
+ 	enum dcp_firmware_version fw_compat;
++	/*
++	 * macOS 27.2 firmware on the firmware-27 interface (T6041, j614s): its
++	 * methods A402-A499 are numbered 50 higher than 27.0's, and A389/A390
++	 * one higher (see dcp_retag_v27_2()).
++	 */
++	bool fw_v27_2;
+ 	/* Bumped by every iomfb poweron; see afk_compact_slot(). */
+ 	u32 afk_power_gen;
+ 	bool external;
+@@ -1208,4 +1214,29 @@
+ 
+ void dcp_panel_edid_receive(struct apple_dcp *dcp, const void *blob, size_t len);
+ 
++
++/*
++ * The 27.2 number of a 27.0 method tag (nixos-m4pro docs/display/dcp-27.2-rpc.md):
++ * A402-A499 move up by 50 (A402-A449 no longer exist), A389/A390 by one. The
++ * callbacks the firmware calls (D###) keep their numbers.
++ */
++static inline void dcp_retag_v27_2(char tag[4])
++{
++	unsigned int n;
++
++	if (tag[0] != 'A' || tag[1] < '0' || tag[1] > '9' || tag[2] < '0' ||
++	    tag[2] > '9' || tag[3] < '0' || tag[3] > '9')
++		return;
++	n = (tag[1] - '0') * 100 + (tag[2] - '0') * 10 + (tag[3] - '0');
++	if (n >= 402 && n <= 499)
++		n += 50;
++	else if (n == 389 || n == 390)
++		n += 1;
++	else
++		return;
++	tag[1] = '0' + n / 100;
++	tag[2] = '0' + n / 10 % 10;
++	tag[3] = '0' + n % 10;
++}
++
+ #endif /* __APPLE_DCP_INTERNAL_H__ */
 --- a/drivers/gpu/drm/apple/dcp.c
 +++ b/drivers/gpu/drm/apple/dcp.c
 @@ -381,6 +381,31 @@
@@ -96,7 +145,7 @@ handoff state. t6041_fw27=0 refuses the 27.2 firmware instead.
  		dev_info(dev, "coprocessor handoff: CPU_CONTROL %#x CPU_STATUS %#x\n",
  			 readl_relaxed(dcp->coproc_reg + APPLE_DCP_COPROC_CPU_CONTROL),
  			 readl_relaxed(dcp->coproc_reg + APPLE_DCP_COPROC_CPU_STATUS));
-@@ -6414,6 +6458,15 @@
+@@ -6414,6 +6458,16 @@
  	if (fw_compat == DCP_FIRMWARE_V_27_0 &&
  	    of_device_is_compatible(dev->of_node, "apple,t8142-dcp"))
  		dcp->hw.iomfb_method_profile = DCP_IOMFB_METHODS_DEFAULT;
@@ -108,7 +157,19 @@ handoff state. t6041_fw27=0 refuses the 27.2 firmware instead.
 +	    of_device_is_compatible(dev->of_node, "apple,t6041-dcp")) {
 +		dcp->hw.num_dptx_ports = 0;
 +		dcp->hw.adopt_live_session = true;
++		dcp->fw_v27_2 = dcp_t6041_fw27(dev);
 +	}
  	/* The display such a processor finds at boot is its first sink. */
  	if (dcp_sink_metadata(dcp))
  		dcp_desktop_metadata_new_sink(dcp);
+--- a/drivers/gpu/drm/apple/iomfb.c
++++ b/drivers/gpu/drm/apple/iomfb.c
+@@ -960,6 +960,8 @@
+ 	if (dcp->hw.iomfb_method_profile == DCP_IOMFB_METHODS_H17G &&
+ 	    call->tag_h17g[0])
+ 		memcpy(resolved.tag, call->tag_h17g, sizeof(resolved.tag));
++	if (dcp->fw_compat == DCP_FIRMWARE_V_27_0 && dcp->fw_v27_2)
++		dcp_retag_v27_2(resolved.tag);
+ 	call = &resolved;
+ 
+ 	struct dcp_channel *ch = dcp_get_channel(dcp, context);
