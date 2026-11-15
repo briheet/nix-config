@@ -35,10 +35,16 @@
       })
     ];
   # appledrm always loads: the GPU driver needs its symbols. While the
-  # internal display on the 27.2 firmware is brought up, a DCP that fails
-  # leaves the panel to the boot framebuffer (simpledrm), and
-  # `appledrm.t6041_fw27=0` on the kernel command line (GRUB `e`) keeps it
-  # off the DCP altogether.
+  # internal display on the 27.2 firmware is brought up, its patch leaves the
+  # DCP alone unless appledrm.t6041_fw27=1, so the panel stays on the boot
+  # framebuffer (simpledrm). The specialisation below adds it: a GRUB entry of
+  # its own, booted once from SSH with `grub-reboot` (GRUB's default entry is
+  # the saved one), so any later boot is the safe default again.
+  specialisation.display-27.configuration = {
+    system.nixos.tags = [ "display-27" ];
+    boot.kernelParams = [ "appledrm.t6041_fw27=1" ];
+  };
+  boot.loader.grub.default = "saved";
 
   # The keyboard and trackpad probe in the initrd.
   boot.initrd.extraFirmwarePaths = [ "apple/tpmtfw-j614s.bin" ];
