@@ -37,8 +37,10 @@
   # While the internal display on the 27.2 firmware is brought up, the display
   # driver does not load at boot: aura enables the display nodes, and the boot
   # framebuffer keeps the panel until appledrm is loaded by hand (logged out).
-  # Remove this once it works.
+  # Remove this once it works. On the command line, so that it holds in the
+  # initrd too (which carries appledrm.ko but not the system's modprobe.d).
   boot.blacklistedKernelModules = [ "appledrm" ];
+  boot.kernelParams = [ "modprobe.blacklist=appledrm" ];
 
   # The keyboard and trackpad probe in the initrd.
   boot.initrd.extraFirmwarePaths = [ "apple/tpmtfw-j614s.bin" ];
