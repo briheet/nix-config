@@ -1,0 +1,266 @@
+aop: debug: dump the AOP's state when its start times out (27.2 bring-up)
+
+Before the driver halts the AOP after a failed start, print what it left:
+its ASC CPU control and status, the mailbox's A2I and I2A state (whether
+the firmware sent anything), its boot arguments, the text in its log
+region and fault strings in its data SRAM, all tagged "aopdbg". Only for
+the T6040 configuration (fw_regions). Remove once the AOP starts on 27.2.
+
+diff --git a/drivers/soc/apple/aop.rs b/drivers/soc/apple/aop.rs
+index 8058e3f..470c51f 100644
+--- a/drivers/soc/apple/aop.rs
++++ b/drivers/soc/apple/aop.rs
+@@ -1986,6 +1986,243 @@ impl AopData {
+     /// otherwise), so they are only checked here. Every page has to be mapped
+     /// where the DT says, the external code (`__ETEXT`) at `ec0p` and any
+     /// other segment (`__OS_LOG`) at its physical address.
++    /// Prints the printable runs (at least `min` bytes) of `bytes` that pass
++    /// `keep`, at most `max` of them, each cut to 160 bytes.
++    fn debug_strings(
++        dev: &device::Device,
++        what: &str,
++        bytes: &[u8],
++        min: usize,
++        max: usize,
++        keep: fn(&[u8]) -> bool,
++    ) {
++        let mut shown = 0;
++        let mut start = None;
++        for i in 0..=bytes.len() {
++            let printable = i < bytes.len() && (0x20..0x7f).contains(&bytes[i]);
++            match (printable, start) {
++                (true, None) => start = Some(i),
++                (false, Some(s)) => {
++                    start = None;
++                    let run = &bytes[s..i];
++                    if run.len() < min || !keep(run) {
++                        continue;
++                    }
++                    let cut = &run[..cmp::min(run.len(), 160)];
++                    if let Ok(text) = core::str::from_utf8(cut) {
++                        dev_info!(dev, "aopdbg {} +{:#x}: {}\n", what, s, text);
++                    }
++                    shown += 1;
++                    if shown == max {
++                        dev_info!(dev, "aopdbg {}: stopped after {} strings\n", what, max);
++                        return;
++                    }
++                }
++                _ => {}
++            }
++        }
++        dev_info!(dev, "aopdbg {}: {} strings\n", what, shown);
++    }
++
++    /// Debug (27.2 bring-up): what the AOP left behind when its start timed
++    /// out, read before it is halted again. Its CPU control and status, the
++    /// mailbox state (did the firmware send anything), the boot arguments,
++    /// the text in its log region and fault strings in its data SRAM.
++    fn debug_start_failure(dev: &device::Device, aop_mmio: &Mmio<'_, Region<AOP_MMIO_SIZE>>) {
++        // SAFETY: `dev` is a live device being probed.
++        let np = unsafe { (*dev.as_raw()).of_node };
++        if np.is_null() {
++            return;
++        }
++
++        // The ASC: CPU control 0x44, status 0x48 (m1n1's asc.c).
++        // SAFETY: `np` is valid; index 1 is the ASC ("asc"), mapped and
++        // unmapped here.
++        let asc = unsafe { bindings::of_iomap(np, 1) };
++        if !asc.is_null() {
++            let rd = |off: usize| -> u32 {
++                // SAFETY: `asc` maps at least the ASC's first 0x4000 bytes.
++                unsafe { asc.cast::<u8>().add(off).cast::<u32>().read_volatile() }
++            };
++            dev_info!(
++                dev,
++                "aopdbg asc: cpu_control {:#010x} cpu_status {:#010x} [0x40..0x60] {:#x} {:#x} {:#x} {:#x} {:#x} {:#x} {:#x} {:#x}\n",
++                rd(0x44),
++                rd(0x48),
++                rd(0x40),
++                rd(0x44),
++                rd(0x48),
++                rd(0x4c),
++                rd(0x50),
++                rd(0x54),
++                rd(0x58),
++                rd(0x5c)
++            );
++            // SAFETY: mapped above.
++            unsafe { bindings::iounmap(asc) };
++        }
++
++        // The mailbox (v4): A2I and I2A control at 0x110 and 0x114; bit 17
++        // empty, bit 16 full.
++        // SAFETY: `np` is valid.
++        let mb = unsafe { bindings::of_parse_phandle(np, c_str!("mboxes").as_char_ptr(), 0) };
++        if !mb.is_null() {
++            // SAFETY: `mb` is a valid node with a reference we drop below.
++            let regs = unsafe { bindings::of_iomap(mb, 0) };
++            if !regs.is_null() {
++                let rd = |off: usize| -> u32 {
++                    // SAFETY: the mailbox maps at least 0x4000 bytes.
++                    unsafe { regs.cast::<u8>().add(off).cast::<u32>().read_volatile() }
++                };
++                dev_info!(
++                    dev,
++                    "aopdbg mbox: a2i_ctrl {:#010x} i2a_ctrl {:#010x} [0x100..0x120] {:#x} {:#x} {:#x} {:#x} {:#x} {:#x} {:#x} {:#x}\n",
++                    rd(0x110),
++                    rd(0x114),
++                    rd(0x100),
++                    rd(0x104),
++                    rd(0x108),
++                    rd(0x10c),
++                    rd(0x110),
++                    rd(0x114),
++                    rd(0x118),
++                    rd(0x11c)
++                );
++                // SAFETY: mapped above.
++                unsafe { bindings::iounmap(regs) };
++            }
++            // SAFETY: of_parse_phandle() took a reference.
++            unsafe { bindings::of_node_put(mb) };
++        }
++
++        // The boot arguments, as the firmware has them now.
++        if let (Ok(offset), Ok(size)) = (
++            aop_mmio.try_read32(BOOTARGS_OFFSET),
++            aop_mmio.try_read32(BOOTARGS_SIZE),
++        ) {
++            let (offset, size) = (offset as usize, size as usize);
++            dev_info!(dev, "aopdbg bootargs at {:#x}, {:#x} bytes\n", offset, size);
++            if offset < AOP_MMIO_SIZE && size <= 0x400 && size <= AOP_MMIO_SIZE - offset {
++                let start = offset & !3;
++                let end = (offset + size + 3) & !3;
++                let mut bytes = KVec::<u8>::new();
++                let mut ok = true;
++                let mut a = start;
++                while a < end {
++                    match aop_mmio.try_read32(a) {
++                        Ok(w) => {
++                            for b in w.to_le_bytes() {
++                                if bytes.push(b, GFP_KERNEL).is_err() {
++                                    ok = false;
++                                }
++                            }
++                        }
++                        Err(_) => ok = false,
++                    }
++                    a += 4;
++                }
++                if ok {
++                    let args = &bytes[offset - start..offset - start + size];
++                    let mut i = 0;
++                    while i + 8 <= args.len() {
++                        let key = &args[i..i + 4];
++                        let len =
++                            u32::from_le_bytes(args[i + 4..i + 8].try_into().unwrap()) as usize;
++                        i += 8;
++                        if len > args.len() - i {
++                            dev_info!(dev, "aopdbg bootarg: bad length {:#x}\n", len);
++                            break;
++                        }
++                        let mut v = [0u8; 8];
++                        let n = cmp::min(len, 8);
++                        v[..n].copy_from_slice(&args[i..i + n]);
++                        let name: [char; 4] = [
++                            key[3] as char,
++                            key[2] as char,
++                            key[1] as char,
++                            key[0] as char,
++                        ];
++                        dev_info!(
++                            dev,
++                            "aopdbg bootarg {}{}{}{} len {} value {:#x}\n",
++                            name[0],
++                            name[1],
++                            name[2],
++                            name[3],
++                            len,
++                            u64::from_le_bytes(v)
++                        );
++                        i += len;
++                    }
++                }
++            }
++        }
++
++        // The log region (the memory-region at its own physical address).
++        // SAFETY: `np` is valid.
++        let count = unsafe { bindings::of_reserved_mem_region_count(np) };
++        for idx in 0..count.max(0) {
++            let Ok((phys, iova, size)) = Self::fw_region(np, idx) else {
++                continue;
++            };
++            dev_info!(
++                dev,
++                "aopdbg region {}: phys {:#x} iova {:#x} size {:#x}\n",
++                idx,
++                phys,
++                iova,
++                size
++            );
++            if iova != phys || size > 0x10_0000 {
++                continue;
++            }
++            // SAFETY: a reserved, no-map region of the firmware's; read only.
++            let virt = unsafe {
++                bindings::memremap(phys, size as usize, bindings::MEMREMAP_WB as _)
++            };
++            if virt.is_null() {
++                dev_info!(dev, "aopdbg: cannot map the log region\n");
++                continue;
++            }
++            let mut bytes = KVec::<u8>::new();
++            let mut ok = true;
++            for off in 0..size as usize {
++                // SAFETY: `virt` maps `size` bytes.
++                let b = unsafe { virt.cast::<u8>().add(off).read_volatile() };
++                if bytes.push(b, GFP_KERNEL).is_err() {
++                    ok = false;
++                    break;
++                }
++            }
++            // SAFETY: mapped above.
++            unsafe { bindings::memunmap(virt) };
++            if ok {
++                let nonzero = bytes.iter().filter(|b| **b != 0).count();
++                dev_info!(dev, "aopdbg log: {} non-zero bytes of {}\n", nonzero, bytes.len());
++                Self::debug_strings(dev, "log", &bytes, 6, 120, |_| true);
++            }
++        }
++
++        // Fault strings in the firmware's data SRAM (after __TEXT, 0xcd000).
++        let mut sram = KVec::<u8>::new();
++        let mut a = 0xcd000;
++        while a + 4 <= AOP_MMIO_SIZE {
++            let Ok(w) = aop_mmio.try_read32(a) else {
++                break;
++            };
++            if sram.extend_from_slice(&w.to_le_bytes(), GFP_KERNEL).is_err() {
++                break;
++            }
++            a += 4;
++        }
++        Self::debug_strings(dev, "sram", &sram, 8, 60, |run| {
++            const WORDS: [&[u8]; 8] = [
++                b"panic", b"PANIC", b"assert", b"ASSERT", b"abort", b"fault", b"xception", b"FAIL",
++            ];
++            WORDS.iter().any(|w| run.windows(w.len()).any(|x| x == *w))
++        });
++    }
++
+     fn check_fw_regions(dev: &device::Device, ec0p: u64) -> Result<()> {
+         // SAFETY: `dev` is a live device being probed.
+         let np = unsafe { (*dev.as_raw()).of_node };
+@@ -3184,6 +3421,9 @@ impl platform::Driver for AopDriver {
+             data.start()
+         };
+         if let Err(e) = started {
++            if cfg.fw_regions {
++                AopData::debug_start_failure(pdev.as_ref(), &aop_mmio);
++            }
+             if cfg.halt_on_failed_start {
+                 // The same teardown as the probe guard's (which then does
+                 // nothing), then back to the halted state the bootloader
