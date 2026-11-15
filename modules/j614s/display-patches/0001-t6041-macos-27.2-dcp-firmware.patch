@@ -1,0 +1,114 @@
+drm/apple: T6041 (M4 Pro) internal panel on the macOS 27.2 DCP firmware
+
+The T6041 DCP was driven only on 26.5.2/26.6.2 firmware (desktop IOMFB).
+On 27.2 drive it through the firmware-27 interface written for the T6050
+(DCP_FIRMWARE_V_27_0), as T8142 is on 27.0: aura publishes
+firmware-version 27.2.x with firmware-compat 27.0.0 (aura-patches/0002).
+On that path, like the T6050: adopt the running session and open no DPTX
+port services on the panel processor; no firmware clock ids (the T6041
+device tree names none); the desktop shared-memory mapping (buffers in
+linear-mapped RAM, which memremap(WC) refuses); and log the coprocessor
+handoff state. t6041_fw27=0 refuses the 27.2 firmware instead.
+(github:briheet/nixos-m4pro docs/display/dcp-27.2-kernel.md)
+
+--- a/drivers/gpu/drm/apple/dcp.c
++++ b/drivers/gpu/drm/apple/dcp.c
+@@ -381,6 +381,31 @@
+ 		 "T6041: drive the external display processors (default 1; 0 leaves them alone)");
+ 
+ /*
++ * T6041 internal panel on the macOS 27.2 DCP firmware (j614s): the boot loader
++ * (aura with nix-config's aura-patches) publishes firmware-version 27.2.x with
++ * firmware-compat 27.0.0, and it is driven through the T6050's firmware-27
++ * interface, as T8142 is on 27.0.  t6041_fw27=0 refuses it instead.
++ */
++static bool t6041_fw27 = true;
++module_param(t6041_fw27, bool, 0444);
++MODULE_PARM_DESC(t6041_fw27,
++		 "T6041 internal panel: drive the 27.2 DCP firmware through the firmware-27 interface (default 1)");
++
++static bool dcp_t6041_fw27(struct device *dev)
++{
++	u32 compat[3], version[3];
++
++	return t6041_fw27 &&
++	       of_device_is_compatible(dev->of_node, "apple,t6041-dcp") &&
++	       of_property_count_u32_elems(dev->of_node, "apple,firmware-compat") == 3 &&
++	       !of_property_read_u32_array(dev->of_node, "apple,firmware-compat", compat, 3) &&
++	       compat[0] == 27 && compat[1] == 0 && compat[2] == 0 &&
++	       of_property_count_u32_elems(dev->of_node, "apple,firmware-version") == 3 &&
++	       !of_property_read_u32_array(dev->of_node, "apple,firmware-version", version, 3) &&
++	       version[0] == 27 && version[1] == 2;
++}
++
++/*
+  * After a wake that finds the internal panel off by DPMS, start its firmware from the
+  * resume, as macOS does about 83 ms into a wake, so that DPMS on only has to light the
+  * panel. If DPMS on hasn't come this long after, the firmware stops again. 0: the
+@@ -1637,7 +1662,13 @@
+ 	struct apple_dcp *dcp = cookie;
+ 	int ret;
+ 
+-	if (bfr->iova && dcp->fw_compat == DCP_FIRMWARE_V_26_6_DESKTOP)
++	/*
++	 * T6041 on firmware 27 keeps the desktop mapping: its buffers can be in
++	 * linear-mapped RAM, which memremap(WC) refuses.
++	 */
++	if (bfr->iova && (dcp->fw_compat == DCP_FIRMWARE_V_26_6_DESKTOP ||
++			  (dcp->fw_compat == DCP_FIRMWARE_V_27_0 &&
++			   of_device_is_compatible(dcp->dev->of_node, "apple,t6041-dcp"))))
+ 		return dcp_desktop_shmem_setup(dcp, bfr);
+ 
+ 	if (bfr->iova) {
+@@ -5267,6 +5298,13 @@
+ 		int compat_ret = dcp_read_fw_version(dev, "apple,firmware-compat",
+ 						     compat_str);
+ 
++		if (dcp_t6041_fw27(dev)) {
++			dev_info(dev, "T6041 DCP firmware %s (compat %s): firmware-27 interface\n",
++				 ret >= 0 ? fw_str : "missing",
++				 compat_ret >= 0 ? compat_str : "missing");
++			return DCP_FIRMWARE_V_27_0;
++		}
++
+ 		if (ret >= 0 && compat_ret >= 0 && !strcmp(fw_str, compat_str) &&
+ 		    (!strcmp(fw_str, "26.5.2") || !strcmp(fw_str, "26.6.2")))
+ 			return DCP_FIRMWARE_V_26_6_DESKTOP;
+@@ -5495,6 +5533,10 @@
+ 	if (clocks == -ENODATA &&
+ 	    of_property_present(dev->of_node, "apple,clock-ids"))
+ 		clocks = 0;
++	/* T6041's device tree names no firmware clocks. */
++	if (clocks == -EINVAL && dcp->fw_compat == DCP_FIRMWARE_V_27_0 &&
++	    of_device_is_compatible(dev->of_node, "apple,t6041-dcp"))
++		clocks = 0;
+ 	if (clocks < 0 || clocks > 64)
+ 		return -EINVAL;
+ 	/*
+@@ -5680,7 +5722,9 @@
+ 	}
+ 
+ 	/* Record the state the boot loader handed the coprocessor over in. */
+-	if (dcp->fw_compat == DCP_FIRMWARE_V_26_6_DESKTOP)
++	if (dcp->fw_compat == DCP_FIRMWARE_V_26_6_DESKTOP ||
++	    (dcp->fw_compat == DCP_FIRMWARE_V_27_0 &&
++	     of_device_is_compatible(dev->of_node, "apple,t6041-dcp")))
+ 		dev_info(dev, "coprocessor handoff: CPU_CONTROL %#x CPU_STATUS %#x\n",
+ 			 readl_relaxed(dcp->coproc_reg + APPLE_DCP_COPROC_CPU_CONTROL),
+ 			 readl_relaxed(dcp->coproc_reg + APPLE_DCP_COPROC_CPU_STATUS));
+@@ -6414,6 +6458,15 @@
+ 	if (fw_compat == DCP_FIRMWARE_V_27_0 &&
+ 	    of_device_is_compatible(dev->of_node, "apple,t8142-dcp"))
+ 		dcp->hw.iomfb_method_profile = DCP_IOMFB_METHODS_DEFAULT;
++	/*
++	 * T6041's internal DCP on firmware 27 runs like the T6050's: adopted
++	 * running, with no DPTX port services on the panel processor.
++	 */
++	if (fw_compat == DCP_FIRMWARE_V_27_0 &&
++	    of_device_is_compatible(dev->of_node, "apple,t6041-dcp")) {
++		dcp->hw.num_dptx_ports = 0;
++		dcp->hw.adopt_live_session = true;
++	}
+ 	/* The display such a processor finds at boot is its first sink. */
+ 	if (dcp_sink_metadata(dcp))
+ 		dcp_desktop_metadata_new_sink(dcp);

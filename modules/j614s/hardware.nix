@@ -16,15 +16,29 @@
   boot.kernelPatches = map (name: { inherit name; patch = ./kernel-patches + "/${name}"; })
     (lib.sort lib.lessThan (lib.filter (lib.hasSuffix ".patch")
       (builtins.attrNames (builtins.readDir ./kernel-patches))));
-  # nixos-aurora's GPU driver built on its own with ./gpu-patches (pkgs/aurora-gpu.nix),
-  # so GPU work rebuilds only the module, not the kernel.
-  boot.extraModulePackages = [
-    (config.boot.kernelPackages.callPackage ./pkgs/aurora-gpu.nix {
-      patches = map (name: ./gpu-patches + "/${name}")
+  # nixos-aurora's GPU and display drivers built on their own with
+  # ./gpu-patches (pkgs/aurora-gpu.nix) and ./display-patches
+  # (pkgs/aurora-display.nix), so driver work rebuilds only the module, not
+  # the kernel.
+  boot.extraModulePackages =
+    let
+      patchesIn = dir: map (name: dir + "/${name}")
         (lib.sort lib.lessThan (lib.filter (lib.hasSuffix ".patch")
-          (builtins.attrNames (builtins.readDir ./gpu-patches))));
-    })
-  ];
+          (builtins.attrNames (builtins.readDir dir))));
+    in
+    [
+      (config.boot.kernelPackages.callPackage ./pkgs/aurora-gpu.nix {
+        patches = patchesIn ./gpu-patches;
+      })
+      (config.boot.kernelPackages.callPackage ./pkgs/aurora-display.nix {
+        patches = patchesIn ./display-patches;
+      })
+    ];
+  # While the internal display on the 27.2 firmware is brought up, the display
+  # driver does not load at boot: aura enables the display nodes, and the boot
+  # framebuffer keeps the panel until appledrm is loaded by hand (logged out).
+  # Remove this once it works.
+  boot.blacklistedKernelModules = [ "appledrm" ];
 
   # The keyboard and trackpad probe in the initrd.
   boot.initrd.extraFirmwarePaths = [ "apple/tpmtfw-j614s.bin" ];

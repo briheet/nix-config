@@ -1,0 +1,86 @@
+kboot_display_handoff: T6041 on 27.2: enable the internal display nodes
+
+The kernel's built-in display gate enables the T6041 display nodes only
+for firmware-compat 26.6.2. For the 27.2 firmware (patch 0002) aura enables
+them itself, after the same checks the gate makes (handoff published, DCP
+running, DART locks, stream IDs) and in the gate's order: the DCP's DART,
+the display's DART, the DCP mailbox, the display subsystem, the DCP and its
+panel. This keeps nixos-aurora's cached kernel. The gate then finds the
+nodes enabled and logs "display handoff refused: -16", changing nothing.
+The 26.6.2 path is unchanged.
+
+--- a/src/kboot_display_handoff.c
++++ b/src/kboot_display_handoff.c
+@@ -2502,6 +2502,56 @@
+ 
+ static bool t6041_headless(void *dt);
+ 
++/*
++ * The kernel's display gate (drivers/soc/apple/display-gate.c) enables the T6041 internal display
++ * nodes only for the 26.6.2 firmware. For the second qualified firmware (27.2, j614s) aura enables
++ * them itself after the same checks, in the gate's order: the DCP's DART, the display's DART, the
++ * DCP mailbox, the display subsystem, the DCP and its panel. Each node is looked up again before
++ * its write, as a shorter "status" moves every node after it.
++ */
++#define DCP6_ENABLE_NODES 6
++static int dcp6_enable_node(void *dt, int which)
++{
++    int dcp = fdt_path_offset(dt, "dcp"), disp = fdt_path_offset(dt, "disp0"), len;
++    const fdt32_t *ph = NULL;
++
++    if (dcp < 0 || disp < 0)
++        return -1;
++    switch (which) {
++        case 0:
++            ph = fdt_getprop(dt, dcp, "iommus", &len);
++            break;
++        case 1:
++            ph = fdt_getprop(dt, disp, "iommus", &len);
++            break;
++        case 2:
++            ph = fdt_getprop(dt, dcp, "mboxes", &len);
++            break;
++        case 3:
++            return disp;
++        case 4:
++            return dcp;
++        default:
++            return fdt_subnode_offset(dt, dcp, "panel");
++    }
++    if (!ph || len < (int)sizeof(fdt32_t))
++        return -1;
++    return fdt_node_offset_by_phandle(dt, fdt32_ld(ph));
++}
++
++static int dcp6_enable_nodes(void *dt)
++{
++    for (int i = 0; i < DCP6_ENABLE_NODES; i++)
++        if (dcp6_enable_node(dt, i) < 0)
++            return -1;
++    for (int i = 0; i < DCP6_ENABLE_NODES; i++) {
++        int node = dcp6_enable_node(dt, i);
++        if (node < 0 || fdt_setprop_string(dt, node, "status", "okay"))
++            return -1;
++    }
++    return 0;
++}
++
+ static __attribute__((noinline)) void dcp6_handoff(void *dt)
+ {
+     struct dcp6_dt n;
+@@ -2532,6 +2582,15 @@
+     }
+     if (dcp6_commit(dt, scratch))
+         return;
++    if (dcp6_os_fw2()) {
++        if (dcp6_enable_nodes(dt))
++            dlog("handoff published (firmware %s, %s), but enabling the display nodes failed\n",
++                 dcp6.uuid, os_firmware.string);
++        else
++            dlog("handoff published (firmware %s, %s); display nodes enabled, marker %s set\n",
++                 dcp6.uuid, os_firmware.string, dcp6.soc->marker);
++        return;
++    }
+     dlog("handoff published (firmware %s, %s); display nodes left disabled, marker %s set\n",
+          dcp6.uuid, os_firmware.string, dcp6.soc->marker);
+ }
