@@ -1,0 +1,58 @@
+The firmware interface version becomes a Variant field; V27_2 writes 27.2's
+0x0c8b6339839804c0 (the firmware crashed with "Host and FW Interface is
+mismatched" on 25G83's 0x0c8aa322039604c0).
+
+--- a/drivers/gpu/drm/asahi/g17/fw/variant.rs
++++ b/drivers/gpu/drm/asahi/g17/fw/variant.rs
+@@ -87,6 +87,9 @@
+     /// work. The bare-metal M5 firmware powers the cores for work by its own policy: under a
+     /// hold, the M5 Ultra's core-power witness reads unpowered until the hold is released.
+     pub(crate) registration_power_hold: bool,
++    /// The interface version the host writes at InitData `+0x00`; the firmware crashes with
++    /// "Host and FW Interface is mismatched" on any other.
++    pub(crate) interface_version: [u16; 4],
+ }
+ 
+ /// A firmware build a SoC supports, identified by its loaded TEXT.
+@@ -137,6 +140,7 @@
+     split_firmware_area: false,
+     m5_commands: false,
+     registration_power_hold: true,
++    interface_version: super::initdata::INTERFACE_VERSION,
+ };
+ 
+ /// The M4 Pro firmware (25G83, `mBoot-18000.161.10`).
+@@ -171,11 +175,16 @@
+     split_firmware_area: false,
+     m5_commands: false,
+     registration_power_hold: true,
++    interface_version: super::initdata::INTERFACE_VERSION,
+ };
+ 
+ /// The M4 Pro firmware of macOS 27.2 (j614s patch). Starts as the 25G83 rules; the layouts
+ /// that differ in 27.2 are being moved here one by one (nixos-m4pro docs/gpu/driver-27.2-diff.md).
+-pub(crate) const V27_2: Variant = Variant { ..V25G83 };
++pub(crate) const V27_2: Variant = Variant {
++    // 0x0c8b6339839804c0 (nixos-m4pro docs/gpu/firmware-decode.md).
++    interface_version: [0x04c0, 0x8398, 0x6339, 0x0c8b],
++    ..V25G83
++};
+ 
+ /// The 26A428 firmware of the M5 GPUs, which runs the M5 protocol (the M5 graph, queues and
+ /// command set).
+--- a/drivers/gpu/drm/asahi/g17/initdata/v25g83.rs
++++ b/drivers/gpu/drm/asahi/g17/initdata/v25g83.rs
+@@ -233,10 +233,9 @@
+             ias: cfg.uat_ias,
+             oas: cfg.uat_oas,
+         };
+-        self.object_mut(self.roots)?.write(
+-            0,
+-            abi::SecondaryRoot::merged(&root, status_b_va, power_state_va, config_va),
+-        )?;
++        let mut merged = abi::SecondaryRoot::merged(&root, status_b_va, power_state_va, config_va);
++        merged.root.version = variant.interface_version;
++        self.object_mut(self.roots)?.write(0, merged)?;
+         for &(offset, value, repeat) in v::POWER_STATE_WORDS {
+             for index in 0..repeat {
+                 self.object_mut(objects.power_state)?
