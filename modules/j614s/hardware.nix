@@ -26,11 +26,6 @@
     })
   ];
 
-  # While the 27.2 variant is being brought up, aurora.ko does not load at
-  # boot: a firmware crash in its probe must not hold up the boot. Load it
-  # by hand to test (`sudo modprobe aurora`); remove this once it works.
-  boot.blacklistedKernelModules = [ "aurora" ];
-
   # The keyboard and trackpad probe in the initrd.
   boot.initrd.extraFirmwarePaths = [ "apple/tpmtfw-j614s.bin" ];
 

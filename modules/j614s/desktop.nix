@@ -1,11 +1,12 @@
-# The desktop on the installed system: Hyprland on the boot framebuffer.
+# The desktop on the installed system: Hyprland, rendered by the GPU, shown
+# on the boot framebuffer.
 #
-# There is no GPU driver for the M4 yet, so Hyprland draws with Mesa's
-# llvmpipe on the CPU into simpledrm (the framebuffer iBoot set up, which m1n1
-# describes), at 3024x1964 and scale 2. Blur, shadows and animations start
-# off because they cost the most in software, so keep them off in your
-# Hyprland config (~/.config/hypr/hyprland.lua, from home-manager or your
-# own; without one Hyprland writes its default).
+# The GPU (aurora.ko with ./gpu-patches, macOS 27.2 firmware) renders; the
+# display is still simpledrm (the framebuffer iBoot set up, which m1n1
+# describes), at 3024x1964 and scale 2, since the display coprocessor (DCP)
+# does not run on 27.2 yet. Mesa pairs the two as it pairs Apple's display
+# driver with the GPU (kmsro, "apple"): /etc/drirc below maps simpledrm to it.
+# Hyprland config: ~/.config/hypr/hyprland.lua (home-manager or your own).
 #
 # Log in on the screen (greetd/tuigreet); it starts Hyprland.
 { lib, pkgs, inputs, ... }:
@@ -13,21 +14,29 @@
 {
   config = {
     programs.hyprland.enable = true;
-    # Mesa: llvmpipe for OpenGL ES and GBM on simpledrm. nixos-aurora's Mesa
-    # is built without llvmpipe (on the Macs it supports the GPU renders), so
-    # with no M4 GPU driver yet Hyprland fell back to softpipe and every frame
-    # and key lagged (2026-11-15). Stock Mesa from the same nixpkgs (cached
-    # on cache.nixos.org) until the GPU works. It has its own lavapipe and
-    # rusticl, which collide with Aurora's (same ICD files), so of Aurora's
-    # extras only the video-decode library stays.
+    # nixos-aurora's Mesa (its default here), with the GPU driver.
     hardware.graphics.enable = true;
-    hardware.graphics.package = lib.mkForce
-      inputs.nixos-aurora.inputs.nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system}.mesa;
-    hardware.graphics.extraPackages = lib.mkForce [ pkgs.libvaV4l2RequestAvd ];
+    # GBM and EGL on simpledrm, which has no render node of its own, would
+    # otherwise get kms_swrast: softpipe, since nixos-aurora's Mesa has no
+    # llvmpipe, and every frame lagged (2026-11-15). Mesa's loader takes a
+    # device's driver from driconf ("loader", by kernel driver): give
+    # simpledrm the kmsro pairing Apple's display driver uses, so it renders
+    # on the GPU and scans out through simpledrm. The GPU's own render node
+    # keeps its driver.
+    environment.etc."drirc".text = ''
+      <?xml version="1.0" standalone="yes"?>
+      <driconf>
+        <device driver="loader" kernel_driver="simpledrm">
+          <application name="Default">
+            <option name="dri_driver" value="apple" />
+          </application>
+        </device>
+      </driconf>
+    '';
 
     # aquamarine (Hyprland's backend) finds no EGL device for simpledrm, which
     # has no render node, and retries on every commit. Its unmerged PR #406
-    # falls back to the GBM platform, where llvmpipe works.
+    # falls back to the GBM platform, which the drirc above sends to the GPU.
     nixpkgs.overlays = [
       (final: prev: {
         aquamarine = prev.aquamarine.overrideAttrs (old: {

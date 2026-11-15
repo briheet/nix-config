@@ -3,9 +3,9 @@
 -- nixos/hyprland.lua. Hyprland 0.57 reads Lua; the wiki is at
 -- https://wiki.hypr.land/configuring/
 --
--- Rendering is on the CPU (Mesa llvmpipe, no GPU driver for the M4 yet), so
--- blur, shadows and animations start off. Turn them on below if they are
--- smooth enough.
+-- Rendering is on the GPU (since 2026-11-15; before, Mesa llvmpipe on the
+-- CPU), but blur, shadows and animations still start off. Turn them on below
+-- once the GPU desktop has proven itself.
 
 ---- Monitor: the whole 3024x1964 panel (notch strip included) at scale 2 ----
 hl.monitor({
