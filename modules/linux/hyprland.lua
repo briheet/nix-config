@@ -80,6 +80,12 @@ hl.gesture({
 ---- Keys: Super is the Command key ----
 local mod = "SUPER"
 
+-- Ghostty's single instance, started without a window, so that a new
+-- terminal opens in it at once (modules/linux/ghostty.nix).
+hl.on("hyprland.start", function()
+    hl.exec_cmd(terminal .. " --initial-window=false")
+end)
+
 hl.bind(mod .. " + Return", hl.dsp.exec_cmd(terminal))
 hl.bind(mod .. " + D", hl.dsp.exec_cmd(menu))
 hl.bind(mod .. " + B", hl.dsp.exec_cmd(browser))
