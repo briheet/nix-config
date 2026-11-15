@@ -1,0 +1,143 @@
+Kick entries: dependency control bits 63:48 = 0x0fa0 as macOS 27.2 writes
+(0xffff before). j614s bring-up: log the first submission records (kick
+entries, ring items, configuration, notification; "j614s-rec").
+
+--- a/drivers/gpu/drm/asahi/g17/fw/initdata/v27_2.rs
++++ b/drivers/gpu/drm/asahi/g17/fw/initdata/v27_2.rs
+@@ -355,3 +355,36 @@
+     }
+     pr_warn!("j614s-fwlog: {} messages\n", printed);
+ }
++
++/// Bits 63:48 of a kick entry's dependency control: 0xffff (25G83), 0x0fa0 under macOS 27.2.
++static KICK_DEPENDENCY_HIGH: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0xffff);
++
++/// Selects the 27.2 kick-entry dependency control (one GPU per system).
++pub(crate) fn set_kick_dependency_high(value: u16) {
++    KICK_DEPENDENCY_HIGH.store(value.into(), core::sync::atomic::Ordering::Relaxed);
++}
++
++/// Bits 63:48 of the dependency control word, in place.
++pub(crate) fn kick_dependency_high() -> u64 {
++    u64::from(KICK_DEPENDENCY_HIGH.load(core::sync::atomic::Ordering::Relaxed)) << 48
++}
++
++/// Whether the j614s bring-up logging is active.
++pub(crate) fn bringup() -> bool {
++    !FW_LOG.load(core::sync::atomic::Ordering::Acquire).is_null()
++}
++
++static RECORDS_DUMPED: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
++
++/// Logs a submission record's nonzero 32-byte rows (bring-up; the first few records only).
++pub(crate) fn dump_record(tag: &str, qid: u32, bytes: &[u8]) {
++    if !bringup() || RECORDS_DUMPED.fetch_add(1, core::sync::atomic::Ordering::Relaxed) >= 40 {
++        return;
++    }
++    for (row, chunk) in bytes.chunks(32).enumerate() {
++        if chunk.iter().all(|&b| b == 0) {
++            continue;
++        }
++        pr_warn!("j614s-rec {} q{} +{:03x} {}\n", tag, qid, row * 32, crate::fwid::Hex(chunk));
++    }
++}
+--- a/drivers/gpu/drm/asahi/g17/fw/kick.rs
++++ b/drivers/gpu/drm/asahi/g17/fw/kick.rs
+@@ -466,8 +466,8 @@
+     const QOS_SLOT_SHIFT: u32 = 32;
+     const QOS_CLASS_SHIFT: u32 = 40;
+     const QOS_CLASS_MAX: u8 = 0x1f;
+-    /// Bits 63:48 of the dependency control word.
+-    const UNK_DEPENDENCY_CONTROL: u64 = 0xffff << 48;
++    // Bits 63:48 of the dependency control word: 0xffff, or 27.2's
++    // (crate::g17::fw::initdata::v27_2::kick_dependency_high).
+     /// Required value of the last word of the entry.
+     const UNK_178: u64 = 0x003f_ffff_ffff_ffff;
+ 
+@@ -534,7 +534,7 @@
+             dependency_control: u64::from(mask)
+                 | u64::from(args.qos.slot) << Self::QOS_SLOT_SHIFT
+                 | u64::from(args.qos.class) << Self::QOS_CLASS_SHIFT
+-                | Self::UNK_DEPENDENCY_CONTROL,
++                | crate::g17::fw::initdata::v27_2::kick_dependency_high(),
+             dependencies,
+             event_mask: args.event_mask,
+             unk_148: 0,
+--- a/drivers/gpu/drm/asahi/g17/initdata/v25g83.rs
++++ b/drivers/gpu/drm/asahi/g17/initdata/v25g83.rs
+@@ -51,6 +51,7 @@
+                 abi::v27_2::FW_LOG_BYTES,
+             )?;
+             abi::v27_2::set_fw_log(messages);
++            abi::v27_2::set_kick_dependency_high(0x0fa0);
+         }
+         if variant.main_config_27_2 {
+             // j614s bring-up: the 25G83 blocks as built, for comparison with macOS 27.2's.
+--- a/drivers/gpu/drm/asahi/g17/kick.rs
++++ b/drivers/gpu/drm/asahi/g17/kick.rs
+@@ -551,6 +551,16 @@
+         // the new entry starts before the outer command is published.
+         unsafe { self.destination.write_unaligned(self.entry) };
+         fence(Ordering::SeqCst);
++        if crate::g17::fw::initdata::v27_2::bringup() {
++            // SAFETY: KickEntry is plain integer storage; the slice covers exactly this value.
++            let bytes = unsafe {
++                core::slice::from_raw_parts(
++                    core::ptr::from_ref(&self.entry).cast::<u8>(),
++                    core::mem::size_of::<KickEntry>(),
++                )
++            };
++            crate::g17::fw::initdata::v27_2::dump_record("kick", self.queue.id.qid().into(), bytes);
++        }
+         if let Backing::Render(ring) = &mut self.queue.backing {
+             ring.written = true;
+         }
+--- a/drivers/gpu/drm/asahi/g17/queue/render/publication.rs
++++ b/drivers/gpu/drm/asahi/g17/queue/render/publication.rs
+@@ -114,7 +114,7 @@
+             push(graph.config.gpu_va() + config_offset as u64);
+         }
+         push(announce_va);
+-        Ok(Self {
++        let lane = Self {
+             items,
+             producer: graph
+                 .queues
+@@ -141,7 +141,36 @@
+             prefix: count as usize - 1,
+             prefix_end: (base + count - 1) % ITEM_RING_ENTRIES,
+             window,
+-        })
++        };
++        lane.dump();
++        Ok(lane)
++    }
++    /// j614s bring-up: logs the lane's items and records.
++    fn dump(&self) {
++        use crate::g17::fw::initdata::v27_2 as d;
++        if !d::bringup() {
++            return;
++        }
++        let qid = self.config.qid as u32;
++        let mut items = [0u8; 32];
++        for (i, value) in self.values.iter().enumerate() {
++            items[i * 8..i * 8 + 8].copy_from_slice(&value.to_le_bytes());
++        }
++        d::dump_record("items", qid, &items);
++        if self.config_present {
++            // SAFETY: QueueConfig is plain integer storage; the slice covers exactly this value.
++            d::dump_record("config", qid, unsafe {
++                core::slice::from_raw_parts(core::ptr::from_ref(&self.config).cast::<u8>(), size_of::<QueueConfig>())
++            });
++        }
++        // SAFETY: as above, for the announcement record.
++        let announce = unsafe {
++            match &self.announce {
++                Announcement::Neo(v) => core::slice::from_raw_parts(core::ptr::from_ref(v).cast::<u8>(), size_of::<KickAnnounce>()),
++                Announcement::M5(v) => core::slice::from_raw_parts(core::ptr::from_ref(v).cast::<u8>(), size_of::<m5::queue::Notification>()),
++            }
++        };
++        d::dump_record("notify", qid, announce);
+     }
+     fn items(&self, range: core::ops::Range<usize>) {
+         for index in range {
