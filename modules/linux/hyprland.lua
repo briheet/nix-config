@@ -7,12 +7,14 @@
 -- coprocessor (since 2026-11-15; before, llvmpipe on the CPU into the boot
 -- framebuffer), so animations are on. Blur and shadows still start off.
 
----- Monitor: the whole 3024x1964 panel (notch strip included) at scale 2 ----
+---- Monitor: the whole 3024x1964 panel (notch strip included) at scale 4/3 ----
+-- (looks like 2268x1473; the panel divides into whole pixels only at
+-- scales 2, 4/3, ...)
 hl.monitor({
     output   = "",
     mode     = "preferred",
     position = "auto",
-    scale    = 2,
+    scale    = 1.333333,
 })
 
 ---- Programs ----
