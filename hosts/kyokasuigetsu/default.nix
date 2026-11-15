@@ -104,10 +104,5 @@
     openssh.authorizedKeys.keyFiles = [
       ../hetzner/secrets.txt
     ];
-    # goryutenmetsu (github.com/briheet-invideo.keys), which drives this Mac
-    # over SSH.
-    openssh.authorizedKeys.keys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOpQTq0QJQSjRg3+2dkh+UOQoVE7vQ2aJPAKicCHG8jP"
-    ];
   };
 }
