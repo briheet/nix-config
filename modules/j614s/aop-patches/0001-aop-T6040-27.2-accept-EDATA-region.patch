@@ -1,15 +1,20 @@
-aop: T6040 on 27.2: accept the firmware's __EDATA region
+aop: T6040 on 27.2: the firmware's __EDATA region and its ED0p boot argument
 
 The macOS 27.2 AOP firmware also runs initialized data (__EDATA) from
 DRAM, which aura (aura-patches/0004) reserves and maps at the IOVA the
 firmware uses, inside the external code window that starts at EC0p
-(0x10000020000 on the J614s). check_fw_regions() accepted a region only
-at EC0p or at its physical address and refused the start. Accept one
-region inside the 16 MiB EC0p window too, checked for its mapping like
-the others.
+(0x10000020000 on the J614s), and takes that IOVA from a new boot
+argument, ED0p. iBoot leaves ED0p at 0, as it does EC0p; with 0 the
+firmware stalls before it reads its mailbox (the AP's first message
+stays unread, nothing comes back) and the start times out (-ETIME).
+
+check_fw_regions() accepted a region only at EC0p or at its physical
+address. Accept one region inside the 16 MiB EC0p window too, checked for
+its mapping like the others, and pass its IOVA as ED0p. Firmware without
+the region (or without ED0p) is unchanged.
 
 diff --git a/drivers/soc/apple/aop.rs b/drivers/soc/apple/aop.rs
-index 2347073..8058e3f 100644
+index 2347073..0b89bff 100644
 --- a/drivers/soc/apple/aop.rs
 +++ b/drivers/soc/apple/aop.rs
 @@ -99,6 +99,8 @@ const BOOTARGS_SIZE: usize = 0x230;
@@ -21,15 +26,26 @@ index 2347073..8058e3f 100644
  const AFK_ENDPOINT_START: u8 = 0x20;
  const AFK_ENDPOINT_COUNT: u8 = 0xf;
  const AFK_OPC_GET_BUF: u64 = 0x89;
-@@ -2009,6 +2011,7 @@ impl AopData {
+@@ -1984,7 +1986,9 @@ impl AopData {
+     /// otherwise), so they are only checked here. Every page has to be mapped
+     /// where the DT says, the external code (`__ETEXT`) at `ec0p` and any
+     /// other segment (`__OS_LOG`) at its physical address.
+-    fn check_fw_regions(dev: &device::Device, ec0p: u64) -> Result<()> {
++    /// Returns the IOVA of the firmware's data region in the EC0p window, if
++    /// it has one (27.2), for its `ED0p` boot argument.
++    fn check_fw_regions(dev: &device::Device, ec0p: u64) -> Result<Option<u64>> {
+         // SAFETY: `dev` is a live device being probed.
+         let np = unsafe { (*dev.as_raw()).of_node };
+         if np.is_null() {
+@@ -2009,6 +2013,7 @@ impl AopData {
              return Err(ENODEV);
          }
          let mut etext = false;
-+        let mut edata = false;
++        let mut edata = None;
          for idx in 0..count {
              let (phys, iova, size) = Self::fw_region(np, idx).inspect_err(|e| {
                  dev_err!(dev, "Invalid firmware memory-region {} ({:?})", idx, e);
-@@ -2023,12 +2026,25 @@ impl AopData {
+@@ -2023,12 +2028,25 @@ impl AopData {
                  dev_err!(dev, "Invalid firmware memory-region {}", idx);
                  return Err(EINVAL);
              }
@@ -46,12 +62,48 @@ index 2347073..8058e3f 100644
                  }
                  etext = true;
 +            } else if in_ext_window {
-+                if edata {
++                if edata.is_some() {
 +                    dev_err!(dev, "Two firmware data memory-regions in the EC0p window");
 +                    return Err(EINVAL);
 +                }
-+                edata = true;
++                edata = Some(iova);
 +                dev_info!(dev, "Firmware data memory-region at IOVA {:#x}", iova);
              } else if iova != phys {
                  dev_err!(
                      dev,
+@@ -2060,7 +2078,7 @@ impl AopData {
+             dev_err!(dev, "No firmware memory-region at EC0p {:#x}", ec0p);
+             return Err(ENOENT);
+         }
+-        Ok(())
++        Ok(edata)
+     }
+ 
+     /// Leaks every allocation the firmware may still access. Called when the
+@@ -3115,10 +3133,12 @@ impl platform::Driver for AopDriver {
+         let asc_req = pdev.io_request_by_index(1).ok_or(EINVAL)?;
+         let asc_mmio = asc_req.iomap_sized::<ASC_MMIO_SIZE>()?;
+         let asc_mmio = asc_mmio.as_view().relaxed();
+-        if cfg.fw_regions {
++        let edata = if cfg.fw_regions {
+             // Before anything is written to the AOP: no mapping, no start.
+-            AopData::check_fw_regions(pdev.as_ref(), cfg.ec0p)?;
+-        }
++            AopData::check_fw_regions(pdev.as_ref(), cfg.ec0p)?
++        } else {
++            None
++        };
+         let data = AopData::new(pdev, cfg)?;
+         // Whatever fails below leaves the AOP running and its children
+         // registering; the same teardown as unbind's cleans that up.
+@@ -3129,6 +3149,10 @@ impl platform::Driver for AopDriver {
+                 &aop_mmio,
+                 &[
+                     (from_fourcc(b"EC0p"), Some(cfg.ec0p)),
++                    // The 27.2 firmware's external data (__EDATA), where
++                    // its region is mapped; it reads it from address 0
++                    // otherwise. `None` keeps the firmware's value.
++                    (from_fourcc(b"ED0p"), edata),
+                     (from_fourcc(b"nCal"), cfg.ncal),
+                     (from_fourcc(b"alig"), Some(cfg.alig)),
+                     (from_fourcc(b"AOPt"), Some(cfg.aopt)),

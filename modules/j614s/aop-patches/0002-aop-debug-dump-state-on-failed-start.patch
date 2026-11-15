@@ -7,13 +7,13 @@ region and fault strings in its data SRAM, all tagged "aopdbg". Only for
 the T6040 configuration (fw_regions). Remove once the AOP starts on 27.2.
 
 diff --git a/drivers/soc/apple/aop.rs b/drivers/soc/apple/aop.rs
-index 8058e3f..470c51f 100644
+index 0b89bff..b20d4d5 100644
 --- a/drivers/soc/apple/aop.rs
 +++ b/drivers/soc/apple/aop.rs
-@@ -1986,6 +1986,243 @@ impl AopData {
-     /// otherwise), so they are only checked here. Every page has to be mapped
-     /// where the DT says, the external code (`__ETEXT`) at `ec0p` and any
-     /// other segment (`__OS_LOG`) at its physical address.
+@@ -1978,6 +1978,244 @@ impl AopData {
+         Ok((phys, iova, size))
+     }
+ 
 +    /// Prints the printable runs (at least `min` bytes) of `bytes` that pass
 +    /// `keep`, at most `max` of them, each cut to 160 bytes.
 +    fn debug_strings(
@@ -251,10 +251,11 @@ index 8058e3f..470c51f 100644
 +        });
 +    }
 +
-     fn check_fw_regions(dev: &device::Device, ec0p: u64) -> Result<()> {
-         // SAFETY: `dev` is a live device being probed.
-         let np = unsafe { (*dev.as_raw()).of_node };
-@@ -3184,6 +3421,9 @@ impl platform::Driver for AopDriver {
++
+     /// Checks the firmware segments the AOP runs from DRAM (T6040). The
+     /// bootloader reserves them and lists them in `memory-region`, and each
+     /// one's `iommu-addresses` gives the IOVA the firmware uses for it. The
+@@ -3192,6 +3430,9 @@ impl platform::Driver for AopDriver {
              data.start()
          };
          if let Err(e) = started {
