@@ -1,5 +1,5 @@
-# record-demo: screen recording for demos, sized for X (Twitter): H.264 MP4,
-# 60 fps, at most 1200 px tall (X takes up to 1920x1200), no audio.
+# record-demo: screen recording for demos: H.264 MP4, 60 fps, at most
+# 1200 px tall, no audio.
 #
 #   record-demo            the whole screen
 #   record-demo region     a region dragged with the mouse (slurp)
