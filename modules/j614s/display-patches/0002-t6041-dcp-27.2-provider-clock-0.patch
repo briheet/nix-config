@@ -1,0 +1,42 @@
+--- a/drivers/gpu/drm/apple/iomfb_v27.c
++++ b/drivers/gpu/drm/apple/iomfb_v27.c
+@@ -138,6 +138,30 @@
+ 	return true;
+ }
+ 
++/*
++ * T6041 (macOS 27.2): ADT /arm-io/dcp has an empty clock-ids, so the device
++ * tree declares no provider clocks. The firmware's setup_video_limits
++ * ("updateFrequencies") asks D401 for the provider's "minimum-frequency" and,
++ * without it, D408 for clock 0: the display pipe clock, which must be at least
++ * the mode's video clock (402278400 Hz at 3024x1964@120), else it gives up and
++ * leaves PixelClock, VideoClock, DisplayClock and DispPerfState at 0. Answer
++ * with disp0's clock: ADT /arm-io/disp0 clock-ids[0] = 376, /arm-io
++ * clock-frequencies[376 - 256] = 712 MHz, the rate the earlier T6041
++ * firmware got from clk_disp0 for the same callback.
++ */
++#define DCP_T6041_DISP0_CLOCK_HZ 712000000ULL
++
++static u64 dcp_v27_undeclared_clock(struct apple_dcp *dcp, u32 index)
++{
++	if (index || dcp->num_firmware_clocks)
++		return 0;
++	if (dcp->clk)
++		return clk_get_rate(dcp->clk);
++	if (of_device_is_compatible(dcp->dev->of_node, "apple,t6041-dcp"))
++		return DCP_T6041_DISP0_CLOCK_HZ;
++	return 0;
++}
++
+ static bool trampoline_get_frequency_v27(struct apple_dcp *dcp, int tag,
+ 					void *out, void *in)
+ {
+@@ -148,6 +172,8 @@
+ 	if (index < dcp->num_firmware_clocks)
+ 		rate = clk_get_rate(dcp->firmware_clocks[index].clk);
+ 	else
++		rate = dcp_v27_undeclared_clock(dcp, index);
++	if (!rate && index >= dcp->num_firmware_clocks)
+ 		dev_err(dcp->dev, "DCP requested undeclared provider clock index %u\n",
+ 			index);
+ 	*(__le64 *)out = cpu_to_le64(rate);

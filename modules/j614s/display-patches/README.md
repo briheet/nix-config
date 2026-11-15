@@ -10,5 +10,8 @@ coprocessor is handed over by aura at boot).
   the macOS 27.2 DCP firmware, through the firmware-27 interface. Needs
   ../aura-patches/0002 and 0003 (the 27.2 handoff, and aura enabling the
   display nodes, since the kernel's built-in gate accepts only 26.6.2).
+- 0002-t6041-dcp-27.2-provider-clock-0.patch: answer the firmware's request
+  for provider clock 0 with the display pipe's clock (712 MHz; this chip
+  lists it on disp0, not the DCP), so it stops giving up on its frequencies.
 
 Developed against github:briheet/nixos-m4pro docs/display/.
