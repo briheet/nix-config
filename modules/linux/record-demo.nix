@@ -35,10 +35,14 @@ let
       # Ctrl+C goes to wf-recorder, which finishes the file; the script
       # carries on to report it.
       trap ':' INT
+      # Colour: the screen is full-range RGB. Convert it to video (limited)
+      # range with the BT.709 matrix and tag the file BT.709, so players
+      # don't guess (untagged full range showed blacks as brown).
       wf-recorder "''${geometry[@]}" \
         -c libx264 -x yuv420p -r 60 \
-        -F "scale=-2:'min(1200,ih)'" \
+        -F "scale=-2:'min(1200,ih)':out_range=tv:out_color_matrix=bt709,format=yuv420p" \
         -p preset=veryfast -p crf=20 \
+        -p x264-params=colorprim=bt709:transfer=bt709:colormatrix=bt709:range=tv \
         -f "$out" || true
       trap - INT
 
