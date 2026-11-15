@@ -154,8 +154,4 @@ hl.config({
         -- Fullscreen apps hand their frames straight to the display.
         direct_scanout = 1,
     },
-    misc = {
-        -- Redraw only what changed (the default, stated).
-        vfr = true,
-    },
 })
