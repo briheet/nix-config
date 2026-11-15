@@ -11,5 +11,7 @@
   programs.ghostty.settings = {
     gtk-single-instance = true;
     quit-after-last-window-closed = false;
+    # See-through background (Hyprland composites it on the GPU).
+    background-opacity = 0.85;
   };
 }

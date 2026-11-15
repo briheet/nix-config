@@ -32,11 +32,8 @@ hl.config({
     general = {
         gaps_in     = 4,
         gaps_out    = 8,
-        border_size = 2,
-        col = {
-            active_border   = "rgba(7ebae4ff)",
-            inactive_border = "rgba(595959aa)",
-        },
+        -- No window borders (no blue highlight on the focused window).
+        border_size = 0,
         resize_on_border = true,
         layout = "dwindle",
     },
