@@ -64,7 +64,7 @@ hl.config({
         kb_options   = "caps:escape",
         follow_mouse = 1,
         touchpad = {
-            natural_scroll       = true,
+            natural_scroll       = false,
             tap_to_click         = true,
             clickfinger_behavior = true,
             scroll_factor        = 0.5,
