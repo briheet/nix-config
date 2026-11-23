@@ -13,12 +13,12 @@
         $env.DIRENV_CONFIG = "/etc/direnv"
       ''
       + ''
-        $env.EDITOR = "hx"
-        $env.VISUAL = "hx"
+        $env.EDITOR = "nvim"
+        $env.VISUAL = "nvim"
       '';
 
     extraConfig = ''
-      $env.config.buffer_editor = "hx"
+      $env.config.buffer_editor = "nvim"
 
       # Nord (previous theme):
       # let nord0 = "#2e3440"

@@ -18,6 +18,7 @@
     ../../modules/common/zoxide.nix
     ../../modules/darwin/zen-browser.nix
     ../../modules/darwin/rex.nix
+    ../../modules/common/nvim.nix
   ];
 
   home.username = "briheet";

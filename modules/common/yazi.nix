@@ -61,8 +61,8 @@ in
 
       opener.edit = [
         {
-          run = "hx %s";
-          desc = "Helix";
+          run = "nvim %s";
+          desc = "Neovim";
           block = true;
           for = "unix";
         }

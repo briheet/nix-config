@@ -123,7 +123,6 @@ in
 
   programs.helix = {
     enable = true;
-    defaultEditor = true;
     # Keep the theme's palette; let Ghostty's existing transparency show through.
     # Nord (previous theme):
     # themes.nord-transparent = {

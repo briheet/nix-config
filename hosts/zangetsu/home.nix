@@ -1,6 +1,7 @@
 {...}: {
   imports = [
     ../../modules/common/helix.nix
+    ../../modules/common/nvim.nix
     ../../modules/common/nushell.nix
     ../../modules/linux/nushell.nix
     ../../modules/common/starship.nix

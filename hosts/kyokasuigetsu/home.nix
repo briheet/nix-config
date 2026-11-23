@@ -11,6 +11,7 @@
     ../../modules/common/lazygit.nix
     ../../modules/common/yazi.nix
     ../../modules/common/helix.nix
+    ../../modules/common/nvim.nix
     ../../modules/common/tmux.nix
     ../../modules/common/ghostty.nix
     ../../modules/common/zellij.nix

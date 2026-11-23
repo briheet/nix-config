@@ -1,46 +1,29 @@
--- Leader
 vim.g.mapleader = " "
-
--- Basic editor behavior
-vim.opt.number = true
-vim.opt.relativenumber = true
+vim.g.maplocalleader = " "
 vim.opt.mouse = "a"
-vim.opt.clipboard = "unnamedplus"
+vim.opt.number = true         -- current line shows its absolute number
+vim.opt.relativenumber = true -- other lines show their distance from it
+vim.opt.scrolloff = 999 -- keep the cursor centred; j/k scroll the text behind it
+vim.opt.splitright = true -- :vsplit opens the new window on the right (and moves there)
+vim.opt.splitbelow = true -- :split opens it below
 
-vim.opt.ignorecase = true
-vim.opt.smartcase = true
+-- lazy.nvim: installs itself on first start, then plugins from lua/plugins/*.lua
+local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+if not vim.uv.fs_stat(lazypath) then
+  local out = vim.fn.system({ "git", "clone", "--filter=blob:none", "--branch=stable",
+    "https://github.com/folke/lazy.nvim.git", lazypath })
+  if vim.v.shell_error ~= 0 then
+    vim.api.nvim_echo({ { "Failed to clone lazy.nvim:\n" .. out, "ErrorMsg" } }, true, {})
+    return
+  end
+end
+vim.opt.rtp:prepend(lazypath)
 
-vim.opt.expandtab = true
-vim.opt.shiftwidth = 2
-vim.opt.tabstop = 2
-
-vim.opt.splitright = true
-vim.opt.splitbelow = true
-
--- Keep UI minimal
-vim.opt.showmode = false
-vim.opt.signcolumn = "yes"
-vim.opt.termguicolors = true
-
-local map = vim.keymap.set
-
--- Easier window movement
-map("n", "<C-h>", "<C-w>h")
-map("n", "<C-j>", "<C-w>j")
-map("n", "<C-k>", "<C-w>k")
-map("n", "<C-l>", "<C-w>l")
-
--- Helix-like line movement
-map({ "n", "v" }, "gh", "^")
-map({ "n", "v" }, "gl", "$")
-
--- Keep selection while indenting
-map("v", "<", "<gv")
-map("v", ">", ">gv")
-
--- Move selected lines
-map("v", "J", ":m '>+1<CR>gv=gv")
-map("v", "K", ":m '<-2<CR>gv=gv")
-
--- Clear search highlight
-map("n", "<Esc>", "<cmd>nohlsearch<CR>")
+require("lazy").setup({
+  spec = { { import = "plugins" } },
+  -- Pinned versions live in the repo; commit this file after :Lazy update.
+  lockfile = vim.fn.expand("~/nix-config/modules/common/nvim/lazy-lock.json"),
+  rocks = { enabled = false }, -- no plugin needs luarocks
+  checker = { enabled = false },
+  change_detection = { enabled = false }, -- config is a read-only nix symlink
+})

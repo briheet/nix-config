@@ -8,8 +8,7 @@ in
     enable = true;
 
     settings = {
-      # Nix installs Helix as hx; do not inherit the shell's EDITOR (nano).
-      os.editPreset = "helix (hx)";
+      os.editPreset = "nvim";
 
       gui = {
         sidePanelWidth = 0.25;
