@@ -91,6 +91,10 @@
       AppleShowAllExtensions = true;
       AppleShowAllFiles = true;
       AppleShowScrollBars = "WhenScrolling";
+
+      # Fast key repeat (held j/k): ~225 ms delay, then ~30 ms per repeat
+      InitialKeyRepeat = 15;
+      KeyRepeat = 2;
       _HIHideMenuBar = true;
 
       # Inverse scrolling
