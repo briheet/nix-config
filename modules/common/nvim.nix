@@ -9,13 +9,18 @@
     withPython3 = false;
 
     # git: lazy.nvim; tree-sitter: building parsers; ripgrep/fd: telescope;
-    # nixfmt: conform (other servers/formatters are in helix.nix home.packages)
+    # nixfmt: conform
     extraPackages = with pkgs; [
       git
       tree-sitter
       ripgrep
       fd
       nixfmt
+      # language servers only nvim uses (the rest are in helix.nix home.packages)
+      lua-language-server
+      bash-language-server
+      vscode-langservers-extracted # jsonls
+      yaml-language-server
     ];
 
     # Lua setup

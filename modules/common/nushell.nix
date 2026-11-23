@@ -331,6 +331,7 @@
       $env.config.show_banner = false
 
       alias lz = lazygit
+      alias vi = nvim
 
       # Pull a project's changes from the GPU box (~/work/<project>) back to this machine.
       #   gpu-pull                   # project named after the current directory, synced into it

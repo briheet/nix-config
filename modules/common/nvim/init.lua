@@ -3,9 +3,15 @@ vim.g.maplocalleader = " "
 vim.opt.mouse = "a"
 vim.opt.number = true         -- current line shows its absolute number
 vim.opt.relativenumber = true -- other lines show their distance from it
+vim.opt.signcolumn = "yes"    -- always reserve the git/diagnostic column so text never shifts
+vim.opt.cursorline = true     -- highlight the current line
+vim.opt.ignorecase = true     -- /foo matches Foo and FOO ...
+vim.opt.smartcase = true      -- ... unless the search has a capital: /Foo matches only Foo
 vim.opt.scrolloff = 999 -- keep the cursor centred; j/k scroll the text behind it
 vim.opt.splitright = true -- :vsplit opens the new window on the right (and moves there)
 vim.opt.splitbelow = true -- :split opens it below
+vim.keymap.set("n", "<leader>\\", "<cmd>vsplit<cr>", { desc = "Split side by side" })
+vim.keymap.set("n", "<leader>-", "<cmd>split<cr>", { desc = "Split below" })
 
 -- lazy.nvim: installs itself on first start, then plugins from lua/plugins/*.lua
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"

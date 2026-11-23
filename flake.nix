@@ -141,7 +141,9 @@
             aura = pkgs.m1n1;
             uBoot = pkgs.uboot-asahi;
             inherit kernel;
-            kernelCommit = (builtins.fromJSON (builtins.readFile "${inputs.nixos-aurora}/kernel/provenance.json")).kernel_commit;
+            kernelCommit =
+              (builtins.fromJSON (builtins.readFile "${inputs.nixos-aurora}/kernel/provenance.json"))
+              .kernel_commit;
           };
           stage1 = host.config.system.build.auraStage1;
           grubCfg = pkgs.writeText "grub.cfg" ''
